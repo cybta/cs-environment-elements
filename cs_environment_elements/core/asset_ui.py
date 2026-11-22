@@ -77,6 +77,8 @@ def _settings_class(cat):
         "piece": EnumProperty(name="Piece", items=piece_items),
         "rotation": FloatProperty(name="Rotation", subtype="ANGLE", default=0.0,
                                   description="Turn the piece round the cursor"),
+        "extra": BoolProperty(name="Attachment", default=False,
+                              description="Add the piece's optional attachment too (parented to it)"),
         "gap": FloatProperty(name="Gap", default=0.5, min=0.0, soft_max=3.0, unit="LENGTH",
                              description="Space between pieces when adding a whole style"),
     }
@@ -102,6 +104,8 @@ def _panel_class(cat):
             item = cat.find(st.kind, st.style, st.piece)
             if item and item.note:
                 layout.label(text=item.note, icon="INFO")
+            if item and item.extra:
+                layout.prop(st, "extra", text=item.extra.label)
             layout.prop(st, "rotation")
             big = layout.row()
             big.scale_y = 1.5
@@ -123,6 +127,14 @@ def _panel_class(cat):
              "bl_space_type": "VIEW_3D", "bl_region_type": "UI", "bl_category": cs_ui.CATEGORY,
              "poll": classmethod(poll), "draw": draw}
     return type(f"CSENV_PT_{cat.section.lower()}", (Panel,), attrs)
+
+
+def _attach(context, child, parent):
+    """Parent a placed attachment to its piece, keeping where it stands."""
+    context.view_layer.update()
+    child.parent = parent
+    child.matrix_parent_inverse = parent.matrix_world.inverted()
+    child.name = f"{parent.name}_{child.name}"
 
 
 class CSENV_OT_add_asset(Operator):
@@ -155,6 +167,8 @@ class CSENV_OT_add_asset(Operator):
         for item in items:
             try:
                 ob = library.place(item, cat.folder, coll, cursor, st.rotation)
+                if item.extra and st.extra:
+                    _attach(context, library.place(item.extra, cat.folder, coll, cursor, st.rotation), ob)
             except (OSError, LookupError) as err:
                 failed.append(f"{item.label}: {err}")
                 continue

@@ -40,6 +40,36 @@ SPRIGS["BUSH"] = dict(
     rows=([(0.0, 0.36, 0.64), (0.45, 0.12, 0.88), (1.0, 0.3, 0.7)],
           [(0.0, 0.12, 0.88), (1.0, 0.12, 0.88)],
           [(0.0, 0.12, 0.88), (1.0, 0.12, 0.88)]))
+# Big-crown leaf textures. A broadleaf card is sized from the crown (canopy * 0.11), so on a
+# 10 m+ tree a small sprig photo makes every leaf ~30 cm across. A species can have a second
+# photo of a bigger, leafier branch ("<SPECIES>_CLUSTER") that a wide crown uses on the same
+# cards (same triangles), so its leaves come out smaller. Species without one keep the sprig.
+CLUSTER_CANOPY = 6.0        # crown width (m, after Leaf Scale) from which a tree switches
+SPRIGS["MAPLE_CLUSTER"] = dict(
+    file="maple-heavy-leaves.png", stem_u=0.44, aspect=1610 / 1545, side=0.10, tip=0.08,
+    rows=([(0.0, 0.41, 0.47), (0.1, 0.05, 0.95), (0.35, 0.0, 1.0), (0.7, 0.03, 0.96), (1.0, 0.38, 0.74)],
+          [(0.0, 0.4, 0.48), (0.4, 0.0, 1.0), (1.0, 0.3, 0.8)],
+          [(0.0, 0.0, 1.0), (1.0, 0.0, 1.0)]))
+SPRIGS["OAK_CLUSTER"] = dict(
+    file="oak-heavy-leaves.png", stem_u=0.498, aspect=1499 / 1553, side=0.10, tip=0.08,
+    rows=([(0.0, 0.45, 0.54), (0.12, 0.0, 1.0), (0.6, 0.0, 1.0), (0.85, 0.2, 0.85), (1.0, 0.36, 0.72)],
+          [(0.0, 0.44, 0.55), (0.4, 0.0, 1.0), (1.0, 0.3, 0.78)],
+          [(0.0, 0.0, 1.0), (1.0, 0.0, 1.0)]))
+# Autumn / red maples on a big crown: the same branch photo in green, yellow and red side by
+# side (maple-heavy-mix.png, made from maple-heavy-leaves[-yellow|-red].png), cell order as
+# maple-mix.png, so the species' colour mix and patches work the same.
+SPRIGS["MAPLE_AUTUMN_CLUSTER"] = SPRIGS["MAPLE_RED_CLUSTER"] = dict(
+    SPRIGS["MAPLE_CLUSTER"], file="maple-heavy-mix.png", cells=3)
+
+
+def foliage_key(species, canopy, leaf_scale=1.0):
+    """The card set a tree uses: its species' sprig, or its big-crown photo on a wide crown."""
+    key = species + "_CLUSTER"
+    if key in SPRIGS and canopy * leaf_scale >= CLUSTER_CANOPY:
+        return key
+    return species
+
+
 FLOWER_SIDES = (8, 6, 4)    # per LOD
 CARD_VERSION = 3        # bump when a card's shape changes: cards saved in older .blend files are rebuilt
 

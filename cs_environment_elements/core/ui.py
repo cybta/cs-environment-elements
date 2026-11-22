@@ -15,7 +15,6 @@ SECTIONS = [
     ("BUILDINGS", "Buildings", "Houses, villas, cottages, shopping rows, fences and their LODs", "HOME", 1),
     ("PROPS", "Props", "Outdoor props: playground, benches, street lamps, poles", "OUTLINER_OB_LIGHT", 2),
     ("INTERIOR", "Interior", "Furniture, old and new styles", "OUTLINER_OB_GROUP_INSTANCE", 3),
-    ("WORLD", "World", "The whole map: terrain, roads, districts, parks and nature", "WORLD", 4),
 ]
 
 # Shown for a section whose tools are not built yet.

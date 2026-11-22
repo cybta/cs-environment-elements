@@ -52,7 +52,7 @@ def sync_modifier(obj, lod=None, realize=False, trim=None, leaf_trim=None):
         mod = obj.modifiers.new(MODIFIER, "NODES")
     if mod.node_group != group:
         mod.node_group = group
-    cards = assets.card_collections(s.species)
+    cards = assets.card_collections(assets.foliage_key(s.species, s.canopy, s.leaf_scale))
     values = {
         "LOD": int(s.preview_lod) if lod is None else lod,
         "Triangles Min": s.tri_min,
@@ -305,7 +305,8 @@ def export_trees(context, trees, folder, per_lod_files):
     written = []
     impostors = []
     try:
-        with _exported_textures(folder, {obj.treegen.species for obj in trees}) as textures:
+        with _exported_textures(folder, {assets.foliage_key(obj.treegen.species, obj.treegen.canopy,
+                                                            obj.treegen.leaf_scale) for obj in trees}) as textures:
             written += textures
             for obj in trees:
                 name = export_name(obj)

@@ -1,11 +1,12 @@
 """Buildings section (formerly the House Generator add-on): houses, villas, old cottages,
-shopping rows and fences, the Surroundings generator, and generic LOD1-3 for all of them."""
+shopping rows, fences and quays, the Surroundings generator, and generic LOD1-3 for all of them."""
 
-from . import cottage_paint, fence, house, house_ui, lod_ui, neighborhood
+from . import cottage_paint, fence, house, house_ui, lod_ui, neighborhood, quay
 
 
 def register():
     fence.register()           # before house: its settings hang off house_gen
+    quay.register()            # (same)
     house.register()
     cottage_paint.register()
     house_ui.register()
@@ -19,4 +20,5 @@ def unregister():
     house_ui.unregister()
     cottage_paint.unregister()
     house.unregister()
+    quay.unregister()
     fence.unregister()

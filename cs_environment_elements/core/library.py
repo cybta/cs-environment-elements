@@ -30,12 +30,15 @@ FLOOR, KEEP = "FLOOR", "KEEP"
 class Item:
     """One placeable piece: `file` is relative to its section's assets folder; `objects`
     limits it to those top-level objects of the file (None = all of them). Copies are named
-    '<name>-<n>' (thing-style-variant, e.g. 'sofa-old-3seat'; default: the key)."""
+    '<name>-<n>' (thing-style-variant, e.g. 'sofa-old-3seat'; default: the key).
+    `extra`: an optional attachment (another Item, mount KEEP, modelled round the same
+    origin) that the panel offers as a checkbox and parents to the placed piece."""
 
-    def __init__(self, key, label, file, objects=None, mount=FLOOR, note="", name=None):
+    def __init__(self, key, label, file, objects=None, mount=FLOOR, note="", name=None, extra=None):
         self.key, self.label, self.file = key, label, file
         self.objects, self.mount, self.note = objects, mount, note
         self.name = naming.slug(name or key)
+        self.extra = extra
 
 
 # --------------------------------------------------------------------------

@@ -13,9 +13,10 @@ from ..core import ui as cs_ui
 from . import cottage_layout as cl
 from . import cottage_paint
 from . import fence
+from . import quay
 from . import shop_ui
 from . import villa_layout as vl
-from .house import _build
+from .house import NOT_BUILDINGS, _build
 
 
 def name_prefix(s):
@@ -71,6 +72,8 @@ class HOUSEGEN_OT_generate(Operator):
         s = context.scene.house_gen
         if s.building_type == "FENCE":
             return bpy.ops.fence_gen.generate()
+        if s.building_type == "QUAY":
+            return bpy.ops.quay_gen.generate()
         return _run(self, context, naming.next_name(name_prefix(s)))
 
 
@@ -83,7 +86,7 @@ class HOUSEGEN_OT_rebuild(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.scene.house_gen.building_type != "FENCE" and selected_building(context) is not None
+        return context.scene.house_gen.building_type not in NOT_BUILDINGS and selected_building(context) is not None
 
     def execute(self, context):
         from ..core.scene_utils import _delete_collection
@@ -105,7 +108,7 @@ class HOUSEGEN_OT_randomize(Operator):
     def execute(self, context):
         s = context.scene.house_gen
         s.seed = random.randint(0, 99999)
-        if s.building_type != "FENCE" and selected_building(context) is not None:
+        if s.building_type not in NOT_BUILDINGS and selected_building(context) is not None:
             return bpy.ops.house_gen.rebuild()
         return bpy.ops.house_gen.generate()
 
@@ -154,6 +157,9 @@ class HOUSEGEN_PT_panel(Panel):
             layout.row(align=True).prop(s, "cottage_style", expand=True)
         if s.building_type == "FENCE":
             fence.draw(layout, context)
+            return
+        if s.building_type == "QUAY":
+            quay.draw(layout, context)
             return
 
         presets = {

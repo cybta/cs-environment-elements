@@ -164,6 +164,7 @@ class FENCEGEN_OT_triangle(Operator):
         ob = _new_outline(context, pts, True)
         _select_only(context, ob)
         _settings(context).outline = ob
+        _settings(context).skip_sides = ""      # a new outline starts fully fenced
         return {"FINISHED"}
 
 
@@ -257,6 +258,7 @@ class FENCEGEN_OT_draw(Operator):
             ob = _new_outline(context, self.points, g.close_drawn)
             _select_only(context, ob)
             g.outline = ob
+            g.skip_sides = ""                   # a new outline starts fully fenced
             bpy.ops.fence_gen.generate()
             return {"FINISHED"}
         return {"RUNNING_MODAL"}
@@ -265,11 +267,10 @@ class FENCEGEN_OT_draw(Operator):
 class FENCEGEN_OT_pick_side(Operator):
     bl_idname = "fence_gen.pick_side"
     bl_label = "Use Selected Edge"
-    bl_description = ("In Edit Mode on the outline, select one edge (or its two points): put the opening "
-                      "there, or (Shared) add / remove that side from the shared sides")
+    bl_description = "In Edit Mode on the outline, select one edge (or its two points) to put the opening there"
     bl_options = {"REGISTER", "UNDO"}
 
-    target: EnumProperty(items=[("DOOR", "Door", ""), ("GATE", "Gate", ""), ("SKIP", "Shared", "")])
+    target: EnumProperty(items=[("DOOR", "Door", ""), ("GATE", "Gate", "")])
 
     def execute(self, context):
         ob = _outline(context)
@@ -284,17 +285,40 @@ class FENCEGEN_OT_pick_side(Operator):
         for i, side in enumerate(fb.sides(fb.outline_chains(ob, context))):
             if side[4] in sel and side[5] in sel:
                 g = _settings(context)
-                if self.target == "SKIP":                   # toggle this side in the shared list
-                    now = set(fb.shared_sides(g.skip_sides)) ^ {i + 1}
-                    g.skip_sides = ", ".join(str(k) for k in sorted(now))
-                    self.report({"INFO"}, f"Side {i + 1} {'shared' if i + 1 in now else 'fenced again'}")
-                    return {"FINISHED"}
                 setattr(g, "door_side" if self.target == "DOOR" else "gate_side", i + 1)
                 setattr(g, "door_pos" if self.target == "DOOR" else "gate_pos", 0.5)
                 self.report({"INFO"}, f"{self.target.title()} on side {i + 1}")
                 return {"FINISHED"}
         self.report({"WARNING"}, "The selected points are not one side of the outline")
         return {"CANCELLED"}
+
+
+class FENCEGEN_OT_fence_selected(Operator):
+    bl_idname = "fence_gen.fence_selected"
+    bl_label = "Fence Selected Edges"
+    bl_description = ("In Edit Mode on the outline, select the edges that get a fence and build it there; "
+                      "every unselected side is left out (shared)")
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        ob = _outline(context)
+        return ob is not None and ob.type == "MESH" and ob.mode == "EDIT"
+
+    def execute(self, context):
+        ob = _outline(context)
+        bm = bmesh.from_edit_mesh(ob.data)
+        picked = {frozenset(v.index for v in e.verts) for e in bm.edges if e.select}
+        if not picked:
+            self.report({"WARNING"}, "Select the edges that should get a fence")
+            return {"CANCELLED"}
+        side_list = fb.sides(fb.outline_chains(ob, context))
+        skip = [i + 1 for i, s in enumerate(side_list) if frozenset((s[4], s[5])) not in picked]
+        if len(skip) == len(side_list):
+            self.report({"WARNING"}, "None of the selected edges is a side of the outline")
+            return {"CANCELLED"}
+        _settings(context).skip_sides = ", ".join(str(k) for k in skip)
+        return bpy.ops.fence_gen.generate()
 
 
 class FENCEGEN_OT_generate(Operator):
@@ -368,14 +392,14 @@ def draw(layout, context):
         col = box.column(align=True)
         shared = set(fb.shared_sides(g.skip_sides))
         for i, s in enumerate(side_list[:16]):
-            tag = "  (shared)" if i + 1 in shared else ""
-            col.label(text=f"Side {i + 1}:  point {s[4] + 1} → {s[5] + 1},  {s[3]:.1f} m{tag}",
-                      icon="UNLINKED" if tag else "NONE")
+            off = i + 1 in shared
+            col.label(text=f"Side {i + 1}:  point {s[4] + 1} → {s[5] + 1},  {s[3]:.1f} m" + ("  (no fence)" if off else ""),
+                      icon="UNLINKED" if off else "NONE")
         if len(side_list) > 16:
             col.label(text=f"... {len(side_list) - 16} more")
     row = box.row(align=True)
-    row.prop(g, "skip_sides")
-    row.operator("fence_gen.pick_side", text="", icon="RESTRICT_SELECT_OFF").target = "SKIP"
+    row.scale_y = 1.3
+    row.operator("fence_gen.fence_selected", icon="EDGESEL")
     if g.skip_sides.strip():
         box.prop(g, "shared_posts")
 
@@ -444,6 +468,7 @@ classes = (
     FENCEGEN_OT_triangle,
     FENCEGEN_OT_draw,
     FENCEGEN_OT_pick_side,
+    FENCEGEN_OT_fence_selected,
     FENCEGEN_OT_generate,
     FENCEGEN_OT_randomize,
     fpaint.FENCEGEN_OT_random_paint,

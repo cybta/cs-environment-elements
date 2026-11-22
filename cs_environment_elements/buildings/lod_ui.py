@@ -22,8 +22,6 @@ def _preview_changed(self, context):
     for root in lod.roots(context, everything=True):
         if any("lod" in o for o in root.children_recursive):
             lod.show(root, int(self.preview))
-    from ..world import world_nature            # the world's tree library follows the same switch
-    world_nature.show_all(int(self.preview))
 
 
 class LODGEN_Settings(PropertyGroup):

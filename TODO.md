@@ -4,7 +4,8 @@ One Blender add-on for the carpentry-simulator world. It replaces **House Genera
 (`room-generator/room_generator`) and **TreeGen** (`cs-tree-generator/treegen`); the old
 folders stay untouched as a backup until this one is proven.
 
-Sidebar tab **CS Env** → section switch at the top: Nature · Buildings · Props · Interior · World.
+Sidebar tab **CS Env** → section switch at the top: Nature · Buildings · Props · Interior.
+(The World section, an experimental whole-map builder, was removed on 2026-11-22.)
 
 ```
 cs_environment_elements/
@@ -13,7 +14,6 @@ cs_environment_elements/
   buildings/  house, villa, cottage, shops, fences, Surroundings, LODs  (was House Generator)
   props/      outdoor props; ships the playground models for now
   interior/   furniture, Old / New
-  world/      the whole map, uses every section above
 tools/        texture/mountain bake scripts (not part of the add-on zip)
 ```
 
@@ -29,7 +29,7 @@ tools/        texture/mountain bake scripts (not part of the add-on zip)
 - [x] Settings, operators and object/scene properties keep their old names, so saved .blend files still work
 - [x] Headless test: register / unregister twice, section gating, every building type (with LODs),
       fence, tree, rock, bundled playground models + textures — all pass (2026-11-22)
-- [ ] World build test — on hold, user said not to run it for now
+- [x] ~~World build test~~ — World section removed (2026-11-22)
 - [ ] Check in the real UI (panel order, sections, nothing missing)
 - [x] Build `cs_environment_elements.zip` (`tools/build_zip.py`), install it in Blender 4.4,
       disable the two old add-ons (left installed, just off) — 2026-11-22
@@ -143,9 +143,8 @@ New pieces: the user will provide them after the merge.
 - [ ] Porch, balcony, awning, chimney options
 - [ ] Swappable window / door library, old and new
 
-## Phase 7 — World
+## Phase 7 — World (dropped)
 
-- [ ] Scatter props along roads and parks (lamps at intervals, benches in parks, poles on streets)
-- [ ] Interior fill for hero buildings
-- [ ] Era switch: Old / New / Mixed town (buildings, props and furniture follow it)
-- [ ] Open from before: forest reads sparse with small trees; no cars yet
+The World section was experimental and was removed on 2026-11-22, with it these plans:
+scattering props along roads and parks, interior fill for hero buildings, an Old / New / Mixed
+era switch for a whole town.

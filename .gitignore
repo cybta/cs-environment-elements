@@ -9,6 +9,7 @@ __pycache__/
 venv/
 
 # Blender
+tools/**/render/
 *.blend1
 *.blend2
 

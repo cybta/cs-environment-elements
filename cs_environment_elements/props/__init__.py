@@ -1,6 +1,6 @@
-"""Props section: outdoor props. For now the old playground set (swing set, slide, seesaw,
-merry-go-round, bench, bin), listed in catalog.py; World > parks places the same models.
-Street lamps, benches, poles etc. come next."""
+"""Props section: outdoor props, listed in catalog.py: the old playground set (swing set,
+slide, seesaw, merry-go-round, bench, bin; World > parks places the same models) and old
+wooden electric poles (built by tools/props/build_electric_pole.py)."""
 
 import os
 

@@ -13,6 +13,7 @@ from bpy.props import (BoolProperty, EnumProperty, FloatProperty, FloatVectorPro
 from . import cottage_layout as cl
 from . import cottage_paint
 from . import fence
+from . import quay
 from . import house_layout as hl
 from ..core import neighborhood_materials as nm
 from . import shop_materials as sm
@@ -38,7 +39,7 @@ def _type_changed(self, context):
     """Villas are bigger than the default house: bump the area when switching to one.
     A cottage is small, with low rooms and thinner timber walls."""
     t = self.building_type
-    if t == "FENCE":
+    if t in NOT_BUILDINGS:
         return
     self.ground_lift = LIFTS.get(t, HOUSE_LIFT)
     shop_ui.apply_construction(self, t == "SHOPS")
@@ -66,7 +67,10 @@ SECTIONS = [
     ("SHOPS", "Shops", "A row of old high-street shops", "HOME", 3),
     ("FENCE", "Fences", "An old wooden board fence round any outline, with a door and a parking gate",
      "MOD_LATTICE", 4),
+    ("QUAY", "Quays", "An old timber quay on piles, straight or T-shaped, with tyres and a ladder",
+     "MOD_ARRAY", 5),
 ]
+NOT_BUILDINGS = ("FENCE", "QUAY")      # sections that show their own tools instead of a building
 COTTAGE_STYLES = [("TIMBER", "Old Timber", "Weathered bare timber siding under a gambrel roof, on steel piles"),
                   ("PAINTED", "Painted", "Weathered painted boards under an open gable roof, on a brick plinth")]
 VILLA_STYLES = [("MODERN", "Modern", "Flat-roofed box with a carport and a stone bay"),
@@ -114,6 +118,7 @@ class HOUSEGEN_Settings(PropertyGroup):
             ("SHOPS", "Shopping Row", "Old high-street shops side by side: glazed shopfronts with awnings and "
              "signs, and a shared entrance with a stair up to the rooms behind the tall upper windows"),
             ("FENCE", "Fences", "Not a building: the panel shows the fence tools"),
+            ("QUAY", "Quays", "Not a building: the panel shows the quay tools"),
         ],
         default="HOUSE", update=_type_changed,
     )
@@ -123,6 +128,7 @@ class HOUSEGEN_Settings(PropertyGroup):
     villa_last: StringProperty(default="MODERN")
     shop: PointerProperty(type=shop_ui.SHOPGEN_Settings)
     fence: PointerProperty(type=fence.FENCEGEN_Settings)
+    quay: PointerProperty(type=quay.QUAYGEN_Settings)
     villa_pitch: FloatProperty(name="Roof Pitch (°)", description="Slope of the gable villa's roof",
                                default=42.0, min=30.0, max=45.0, step=100)
     villa_site: BoolProperty(name="Driveway & Paving", description="Driveway, front path and a paved strip "
