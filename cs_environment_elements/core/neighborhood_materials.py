@@ -56,6 +56,7 @@ RECIPES = {
     "C_path": dict(tex="rectangular_paving", scale=0.667, base=(0.78, 0.72, 0.62), rough=0.8),
     # (also the world's gravel roads; the texture is baked by tools/make_world_textures.py)
     "C_world_gravel": dict(tex="world_gravel", scale=0.25, base=(0.36, 0.29, 0.21), rough=0.9),
+    "C_world_dirt": dict(tex="world_dirt", scale=0.25, base=(0.33, 0.25, 0.17), rough=0.9),    # worn verges, yards
     "C_grass": dict(tex="leafy_grass", scale=0.5, base=(0.25, 0.5, 0.16), rough=0.95),
     "C_compound_wall": dict(tex="white_stucco", scale=0.333, base=(0.85, 0.8, 0.7), rough=0.9),
     # Villas: vertical timber boards, and tile sheets baked from assets/tiles. The wall

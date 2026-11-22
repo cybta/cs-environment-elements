@@ -11,6 +11,7 @@ _BIN = "bins/wheelie_bin.blend"
 _GARDEN = "garden/garden_set.blend"
 _YARD = "garden/yard_furniture.blend"
 _LAUNDRY = "garden/clothesline.blend"
+_WOODSHED = "garden/woodshed.blend"
 
 
 _LAMP = Item("pole_old_lamp_kit", "Street Lamp", _POLE, ["ElectricPoleOldLampKit"], mount=KEEP,
@@ -66,8 +67,11 @@ KINDS = [
                 Item("clothesline_empty", "Clothesline (Empty)", _LAUNDRY, ["ClotheslineEmpty"],
                      name="clothesline-old"),
                 Item("laundry_basket", "Laundry Basket", _LAUNDRY, ["LaundryBasket"], name="basket-laundry-old"),
-                Item("wash_tub", "Wash Tub", _LAUNDRY, ["WashTub"], name="tub-wash-old")],   # build_clothesline.py
-        "NEW": [],
+                Item("wash_tub", "Wash Tub", _LAUNDRY, ["WashTub"], name="tub-wash-old"),   # build_clothesline.py
+                Item("woodshed_old", "Firewood Shed", _WOODSHED, ["WoodshedOld"], name="woodshed-old",
+                     note="3 x 1 m, open front to -Y, full of split logs")],
+        "NEW": [Item("woodshed_new", "Firewood Shed", _WOODSHED, ["WoodshedNew"], name="woodshed-new",
+                     note="3 x 1 m fresh pine, open front to -Y, full of split logs")],   # build_woodshed.py
     }),
     ("BINS", "Bins", "TRASH", {                                   # tools/props/build_wheelie_bin.py
         "ANY": [Item("wheelie_bin_green", "Wheelie Bin, Green", _BIN, ["WheelieBinGreen"], mount=KEEP,

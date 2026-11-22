@@ -10,6 +10,7 @@ venv/
 
 # Blender
 tools/**/render/
+tools/scenes/out/
 *.blend1
 *.blend2
 
