@@ -14,7 +14,9 @@ Shapes on a wall are drawn in its own frame (villa_arch.Wall: s along it, w out 
 
 import math
 
+from . import door_leaf
 from . import villa_arch as va
+from .mesh_utils import _obj
 from . import villa_med_court
 from .villa_arch import Wall
 from .villa_med_layout import PITCH
@@ -101,15 +103,20 @@ def _surround(s0, s1, zs, t, width, proud, key=True, z0=0.0):
 # Sills and shutters
 # --------------------------------------------------------------------------
 
-def _sills(c):
+def _sills(c, head=0.16):
+    """Stone sills under the square windows, and a stone head over them and the square glazed
+    doors (where the wall has room above)."""
     boxes = []
     for f in c.plan.floors:
         for o in f.openings:
-            if not o.exterior or o.kind != "WINDOW" or getattr(o, "round", False) or o.z0 < 0.2:
+            if not o.exterior or o.kind not in ("WINDOW", "PATIO") or getattr(o, "round", False):
                 continue
             t = o.thickness or c.te
-            boxes.append(_wall_of(f, o).box(o.s0 - 0.06, o.s1 + 0.06, t / 2 - 0.06, t / 2 + 0.05,
-                                            o.z0 - 0.07, o.z0 + 0.012))
+            wall = _wall_of(f, o)
+            if o.kind == "WINDOW" and o.z0 >= 0.2:
+                boxes.append(wall.box(o.s0 - 0.06, o.s1 + 0.06, t / 2 - 0.06, t / 2 + 0.05, o.z0 - 0.07, o.z0 + 0.012))
+            if o.z1 + head + 0.05 <= c.H:
+                boxes.append(wall.box(o.s0 - 0.09, o.s1 + 0.09, t / 2 - 0.02, t / 2 + 0.04, o.z1, o.z1 + head))
     c.add("Sills", boxes, _lime(c))
 
 
@@ -140,6 +147,11 @@ def _shutters(c):
                 boxes.append(wall.box(s0, s1, w0, w1, o.z0, o.z1))
                 for zz in (o.z0 + 0.06, (o.z0 + o.z1) / 2, o.z1 - 0.06):       # rails standing proud
                     boxes.append(wall.box(s0 + 0.03, s1 - 0.03, w1, w1 + 0.015, zz - 0.04, zz + 0.04))
+    if "shutter" in c.mats:          # the louvred shutter picture on plain boards (it has its own rails)
+        boards = boxes[::4]
+        me = door_leaf.leaves_mesh(f"{c.name}_Shutters", boards, c.center)
+        _obj(f"{c.name}_Shutters", me, c.coll, c.root, [c.mats["shutter"]])
+        return
     c.add("Shutters", boxes, c.mats["door"])
 
 
@@ -160,8 +172,13 @@ def _entrance(c):
     va.add(c, "EntranceArch", wall, [va.prism(p, -t / 2, t / 2) for p in va.spandrels(s0, s1, zs, zt)],
            face, m["wall_in"], face)
     # Two leaves in one round-topped slab, a dark astragal where they meet, a pull handle on each
-    va.add(c, "EntranceDoor", wall, [va.prism(va.round_top(s0, s1, 0.0, zs), -0.03, 0.03)], m["door"])
-    va.add(c, "EntranceDoorTrim", wall, [va.box(sm - 0.014, sm + 0.014, -0.04, 0.04, 0.0, zt - 0.004)]
+    leaf = [va.prism(va.round_top(s0, s1, 0.0, zs), -0.03, 0.03)]
+    if "door_arched" in m:           # the studded door picture (its own stiles, rings and handle)
+        ob = va.add(c, "EntranceDoor", wall, leaf, m["door_arched"])
+        door_leaf.fit_uvs(ob.data)
+    else:
+        va.add(c, "EntranceDoor", wall, leaf, m["door"])
+        va.add(c, "EntranceDoorTrim", wall, [va.box(sm - 0.014, sm + 0.014, -0.04, 0.04, 0.0, zt - 0.004)]
            + [va.box(sm + k - 0.012, sm + k + 0.012, 0.03, 0.06, 0.9, 1.2) for k in (-0.09, 0.09)], m["trim"])
     va.add(c, "EntranceSurround", wall, _surround(s0, s1, zs, t, 0.2, 0.06), _lime(c))
     c.add("EntranceStep", [wall.box(s0 - 0.6, s1 + 0.6, t / 2, t / 2 + 1.0, c.G, -0.03)], _lime(c))

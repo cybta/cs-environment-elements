@@ -12,9 +12,11 @@ from bpy.props import (BoolProperty, EnumProperty, FloatProperty, FloatVectorPro
 
 from . import cottage_layout as cl
 from . import cottage_paint
+from . import door_leaf
 from . import fence
 from . import quay
 from . import house_layout as hl
+from . import podium
 from ..core import neighborhood_materials as nm
 from . import shop_materials as sm
 from . import shop_ui
@@ -143,11 +145,16 @@ class HOUSEGEN_Settings(PropertyGroup):
     shop: PointerProperty(type=shop_ui.SHOPGEN_Settings)
     fence: PointerProperty(type=fence.FENCEGEN_Settings)
     quay: PointerProperty(type=quay.QUAYGEN_Settings)
+    podium: PointerProperty(type=podium.PODIUM_Settings)
     villa_pitch: FloatProperty(name="Roof Pitch (°)", description="Slope of the gable villa's roof",
                                default=42.0, min=30.0, max=45.0, step=100)
     villa_site: BoolProperty(name="Driveway & Paving", description="Driveway, front path and a paved strip "
                              "behind the house", default=True)
     villa_pool: BoolProperty(name="Pool", description="A pool in the back garden", default=False)
+    pool_length: FloatProperty(name="Pool Length (m)", default=10.0, min=3.0, max=30.0, step=50,
+                               description="The pool's long side")
+    pool_width: FloatProperty(name="Pool Width (m)", default=5.0, min=2.0, max=15.0, step=50,
+                              description="The pool's short side")
     cottage_style: EnumProperty(name="Cottage Style", items=COTTAGE_STYLES, default="TIMBER")
     # Cottage paint (cottage_paint / core.paint): changing these repaints the selected cottage
     cottage_roof: EnumProperty(name="Roof Sheet", items=nm.COTTAGE_ROOF_ITEMS, default="RANDOM",
@@ -365,6 +372,7 @@ def _pick_materials(s):
                 "paving": _material("RoomGen_VillaPaving", (0.62, 0.6, 0.57)),
                 "drive": _material("RoomGen_VillaDrive", (0.72, 0.68, 0.6)),
                 "water": _material("RoomGen_VillaWater", (0.1, 0.35, 0.55)),
+                "pool_edge": _material("RoomGen_PodiumAshlar", (0.78, 0.73, 0.63)),
             })
         if s.building_type == "COTTAGE":
             m.update({
@@ -381,6 +389,7 @@ def _pick_materials(s):
                           "baluster": m["trim"], "veranda_rail": m["trim"], "bargeboard": m["trim"]})
     if s.building_type == "SHOPS":
         sm.shop_roles(m, s.material_style == "NEIGHBORHOOD")
+    door_leaf.add_roles(m, s.building_type)
     m["label"] = _material("RoomGen_Label", (0.05, 0.05, 0.05))
     return m
 
@@ -541,21 +550,28 @@ def _build(context, s, report, name=None, site=False):
             _obj(f"{p}_StairFenceRail", rail, fc, root, [mats.get("trim", mats["rail"])])
 
         if s.add_inserts:
-            leaves, inner, panes = [], [], []
+            leaves, inner, main, panes = [], [], [], []
             for o in f.openings:
                 if not o.leaf or o.kind == "ARCH":
                     continue
                 if o.kind in ("DOOR", "ENTRANCE"):
                     b = hl.opening_box(o, min(0.045, o.thickness * 0.8))
-                    # a palette may give inside doors their own material ("door_in")
-                    (inner if o.kind == "DOOR" and "door_in" in mats else leaves).append(
-                        (b[0], b[1], b[2], b[3], b[4], b[5] - 0.005))
+                    # a palette may give inside doors ("door_in") and the front door ("door_main") their own look
+                    if o.kind == "DOOR" and "door_in" in mats:
+                        to = inner
+                    elif o.kind == "ENTRANCE" and "door_main" in mats:
+                        to = main
+                    else:
+                        to = leaves
+                    to.append((b[0], b[1], b[2], b[3], b[4], b[5] - 0.005))
                 else:
                     panes.append(hl.opening_box(o, 0.006))
             if leaves:
                 _obj(f"{p}_Doors", _boxes_mesh(f"{p}_Doors", leaves, off), fc, root, [mats["door"]])
-            if inner:
-                _obj(f"{p}_InnerDoors", _boxes_mesh(f"{p}_InnerDoors", inner, off), fc, root, [mats["door_in"]])
+            for label, boxes, role in (("InnerDoors", inner, "door_in"), ("FrontDoor", main, "door_main")):
+                if boxes:   # pictures of whole doors get fitted UVs; the cottage's boards keep metric ones
+                    mk = door_leaf.leaves_mesh if mats[role].name.startswith("C_door_") else _boxes_mesh
+                    _obj(f"{p}_{label}", mk(f"{p}_{label}", boxes, off), fc, root, [mats[role]])
             if panes:
                 _obj(f"{p}_Glass", trimmed(_boxes_mesh(f"{p}_Glass", panes, off)), fc, root, [mats["glass"]])
 
@@ -584,14 +600,14 @@ def _build(context, s, report, name=None, site=False):
         _build_roof(s, plan, top + plan.slab, coll, root, mats, name)
 
     if site:
-        _onto_ground(s, plan, coll, root, name, center, villa)
+        _onto_ground(s, plan, coll, root, name, center, villa, mats)
 
     from . import lod_ui
     lod_ui.after_build(context, root)
     return plan
 
 
-def _onto_ground(s, plan, coll, root, name, center, villa):
+def _onto_ground(s, plan, coll, root, name, center, villa, mats):
     """Lift everything built so far by s.ground_lift (the root stays on the ground), then
     lay what goes round it on the ground:
     - house: a sidewalk ring with its top level with the ground floor, so the door has no step;
@@ -599,11 +615,17 @@ def _onto_ground(s, plan, coll, root, name, center, villa):
     - shops: their street sidewalk and kerb are in front already (shop_extras), so a ring
       behind and beside, level with that sidewalk."""
     t, lift = s.building_type, s.ground_lift
+    raised = podium.active(s)
+    if raised:                                    # the podium section lifts it further
+        lift += s.podium.height
     root["ground_lift"] = lift
     if lift:
         parts = set(root.children) | {o for o in coll.all_objects if o.parent is None and o != root}
         for ob in parts:
             ob.location.z += lift
+    if raised:                                    # its terrace takes the sidewalk's place
+        podium.build(s, plan, mats, coll, root, name, center, lift)
+        return
     if not s.sidewalk or villa:
         return
     from ..core.materials import _material
@@ -637,7 +659,8 @@ def _onto_ground(s, plan, coll, root, name, center, villa):
 
 
 classes = (
-    shop_ui.SHOPGEN_Settings,      # before HOUSEGEN_Settings, which points at it
+    shop_ui.SHOPGEN_Settings,      # before HOUSEGEN_Settings, which points at them
+    podium.PODIUM_Settings,
     HOUSEGEN_Settings,
 )
 

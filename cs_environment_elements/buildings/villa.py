@@ -65,6 +65,8 @@ def build_exterior(s, plan, mats, coll, root, name, center):
         _site(c)
     if s.villa_pool:
         _pool(c)
+    from . import villa_dress       # garden, lights, gutters / window boxes, loungers
+    villa_dress.dress(c)
 
 
 # --------------------------------------------------------------------------
@@ -166,12 +168,37 @@ def _flat_roof(c):
     slab = c.plan.slab
     c.add("TopCeiling", [(-te / 2, -te / 2, top, W + te / 2, D + te / 2, top + slab)],
           paint=(m["roof_flat"], m["ceiling"], m["wall_out"]))
-    c.add("Roof", [(-te / 2 - 0.35, -te / 2 - 1.1, top + slab, W + te / 2 + 0.35, D + te / 2 + 0.5, top + slab + 0.28)],
+    side, back = 0.6, 0.8                                    # overhangs (the front's is 1.1 m)
+    c.add("Roof", [(-te / 2 - side, -te / 2 - 1.1, top + slab, W + te / 2 + side, D + te / 2 + back, top + slab + 0.53)],
           paint=(m["roof_flat"], m["soffit_wood"], m["trim"]))
+    if "lamp" in m:     # downlights set into the soffit, a row round every side
+        z = top + slab
+        xa, xb = -te / 2 - side / 2, W + te / 2 + side / 2
+        ya, yb = -te / 2 - 0.55, D + te / 2 + back / 2
+        spots = []
+        for y in (ya, yb):
+            n = max(2, round((xb - xa) / 1.8))
+            spots += [(xa + (xb - xa) * (k + 0.5) / n, y) for k in range(n)]
+        for x in (xa, xb):
+            n = max(2, round((yb - ya) / 1.8))
+            spots += [(x, ya + (yb - ya) * (k + 0.5) / n) for k in range(n)]
+        c.add("SoffitLights", [(x - 0.06, y - 0.06, z - 0.006, x + 0.06, y + 0.06, z + 0.001) for x, y in spots],
+              m["lamp"])
     # A stone blade standing proud of the bay's outer corner, ground to roof
     bay = c.upper.room(c.plan.villa["bay"])
-    x0 = W + te / 2 if bay.x1 > W - EPS else -te / 2 - 0.3
-    c.add("StoneBlade", [(x0, -te / 2 - 0.6, c.G, x0 + 0.3, 2.2, top + slab)], m["accent"])
+    east = bay.x1 > W - EPS
+    x0 = W + te / 2 if east else -te / 2 - 0.05             # 5 cm proud of the side wall (user)
+    # it runs back along the side wall, stopping short of the first window on that wall
+    side = [o.s0 for f in c.plan.floors for o in f.openings
+            if o.exterior and o.axis == "Y" and abs(o.coord - (W if east else 0.0)) < 0.05]
+    y1 = min([2.2] + [s - 0.5 for s in side])         # (clear of a side balcony's slab too)
+    if y1 > -te / 2 + 0.2:
+        # a 5 cm plate along the side wall, and in front of the facade a solid 30 cm block that
+        # grows inwards from it (user, 2026-11-26)
+        outer = x0 + 0.05 if east else x0
+        a, b = sorted((outer, outer - 0.3 if east else outer + 0.3))
+        c.add("StoneBlade", [(x0, -te / 2, c.G, x0 + 0.05, y1, top + slab),
+                             (a, -te / 2 - 0.6, c.G, b, -te / 2, top + slab)], m["accent"])
 
 
 def _skylights(c, x_e, tn, cs, y0, y1):
@@ -237,10 +264,12 @@ def _gable_roof(c):
             me = _boxes_mesh(f"{c.name}_{label}_{side}", boxes, Vector())
             me.transform(M)
             me.update()
-            if mat is None:     # tiles on top, white underneath and on the edges (the verge frame)
+            if mat is None:     # roofing on top, the soffit underneath, the fascia (if any) on the edges
                 i_roof, i_soffit = _mat_index(me, m["roof"]), _mat_index(me, m["soffit"])
+                i_edge = _mat_index(me, m.get("fascia", m["soffit"]))
                 for poly in me.polygons:
-                    poly.material_index = i_roof if poly.normal.dot(n) > 0.5 else i_soffit
+                    d = poly.normal.dot(n)
+                    poly.material_index = i_roof if d > 0.5 else i_soffit if d < -0.5 else i_edge
             return _obj(f"{c.name}_{label}_{side}", me, c.coll, c.root, [mat] if mat else ())
 
         obj("Roof", slab)
@@ -274,17 +303,23 @@ def _site(c, path_half=0.7):
     if ent:
         mid = (ent.s0 + ent.s1) / 2
         c.add("FrontPath", [(mid - path_half, -FRONT_YARD, G, mid + path_half, -te / 2 - 1.0, G + 0.04)], m["paving"])
-    c.add("BackPatio", [(-te / 2, D + te / 2, G, W + te / 2, D + te / 2 + 3.0, G + 0.04)], m["paving"])
+    from . import podium
+    if not podium.active(c.s):      # a raised podium's terrace is the patio: no thin slab on top of it
+        c.add("BackPatio", [(-te / 2, D + te / 2, G, W + te / 2, D + te / 2 + 3.0, G + 0.04)], m["paving"])
 
 
-def _pool(c, width=4.0, length=8.0, rim=0.4, along=False):
-    """`along`: the long side parallel to the back of the house (the Mediterranean villa)."""
+def _pool(c, rim=0.5, along=False):
+    """`along`: the long side parallel to the back of the house (the Mediterranean villa).
+    Its size is the panel's; the border is stone coping (the podium's ashlar), not the paving."""
     W, D, te, G, m = c.W, c.D, c.te, c.G, c.mats
+    width, length = c.s.pool_width, c.s.pool_length
     wx, wy = (length, width) if along else (width, length)
     x0, y0 = W / 2 - wx / 2, D + te / 2 + 4.0
+    if c.modern:        # beside the house on its right (seen from the street), clear of the side balconies
+        x0, y0 = W + te / 2 + 3.2, max(0.5, D - length - 0.5)
     x1, y1 = x0 + wx, y0 + wy
     c.add("PoolEdge", [
-        (x0 - rim, y0 - rim, G, x1 + rim, y0, G + 0.1), (x0 - rim, y1, G, x1 + rim, y1 + rim, G + 0.1),
-        (x0 - rim, y0, G, x0, y1, G + 0.1), (x1, y0, G, x1 + rim, y1, G + 0.1),
-    ], m["paving"])
+        (x0 - rim, y0 - rim, G, x1 + rim, y0, G + 0.12), (x0 - rim, y1, G, x1 + rim, y1 + rim, G + 0.12),
+        (x0 - rim, y0, G, x0, y1, G + 0.12), (x1, y0, G, x1 + rim, y1, G + 0.12),
+    ], m.get("pool_edge", m["paving"]))
     c.add("PoolWater", [(x0, y0, G, x1, y1, G + 0.06)], m["water"])

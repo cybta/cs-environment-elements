@@ -134,6 +134,24 @@ def _glaze(f, room, axis, coord, s0, s1, z0, z1, kind="PATIO", width=None, pad=0
 # Turning the finished plan (rooms, openings and boxes together)
 # --------------------------------------------------------------------------
 
+def _side_balcony_doors(u, Wd, per_side=2, slab_out=0.35):
+    """Modern villa: on each side wall upstairs (the engine's X walls at y = 0 and y = Wd), the two
+    widest bedroom / study windows become floor-length French doors onto a small balcony
+    (villa_dress builds the balconies), kept apart so the balconies don't touch."""
+    rooms = ("master", "bedroom", "study")
+    for coord in (0.0, Wd):
+        cands = sorted((o for o in u.openings if o.kind == "WINDOW" and o.axis == "X" and abs(o.coord - coord) < 1e-3
+                        and u.room(o.rooms[0]).kind in rooms), key=lambda o: o.s0 - o.s1)
+        picked = []
+        for o in cands:
+            if len(picked) == per_side:
+                break
+            if all(o.s1 + slab_out + 1.0 < q.s0 - slab_out or q.s1 + slab_out + 1.0 < o.s0 - slab_out for q in picked):
+                picked.append(o)
+        for o in picked:
+            o.kind, o.z0, o.z1 = "PATIO", 0.0, 2.3
+
+
 def _transpose(plan):
     """Swap X and Y."""
     def sw(b):
@@ -352,6 +370,8 @@ def _make(style, area, bedrooms, bathrooms, seed, ceiling_h, slab, t_ext, t_int,
             keep.append(o)
         u.openings = keep
 
+    if modern:
+        _side_balcony_doors(u, Wd)
     for f in plan.floors:
         hl._build_walls(plan, f)
     hl._build_stair(rng, plan, g, u, style="VILLA")
@@ -371,6 +391,26 @@ def _make(style, area, bedrooms, bathrooms, seed, ceiling_h, slab, t_ext, t_int,
     g.accents.append(front)
     u.accents.append(front)
     u.accents.append((bal.x0 - te, bal.y1 - te, bal.x1 + te, bal.y1 + te, "accent" if not modern else "recess"))
+    stone_corner = None
+    if modern:          # the walls round the carport: dark timber slats
+        cp = next(r for r in g.rooms if r.kind == "carport")
+        g.accents.append((cp.x0, cp.y0 - 1.0, cp.x1, cp.y1, "carport_wall"))
+        # The back corner away from the garden doors: the bay's stone, from its last window round
+        # onto the side wall
+        Dp = plan.D
+        back = [o for o in g.openings if o.axis == "X" and abs(o.coord - Dp) < 0.05]
+        doors = [(o.s0 + o.s1) / 2 for o in back if o.kind == "PATIO"]
+        east = (sum(doors) / len(doors) if doors else W / 2) <= W / 2
+        if east:
+            a = max([o.s1 for o in back] + [W - 1.4])
+            g.accents.append((a + 0.01, Dp - 1.4, W + te + 0.1, Dp + te + 0.1, "accent"))
+            stone_corner = (a, W + te / 2)
+        else:
+            b = min([o.s0 for o in back] + [1.4])
+            g.accents.append((-te - 0.1, Dp - 1.4, b - 0.01, Dp + te + 0.1, "accent"))
+            stone_corner = (-te / 2, b)
+    else:               # the gable villa's ground floor: dark stacked stone wherever the timber bay isn't
+        g.accents.append((-te - 1.0, -te - 1.0, W + te + 1.0, plan.D + te + 1.0, "base_stone"))
 
     ridge_z = None
     if not modern:
@@ -380,6 +420,6 @@ def _make(style, area, bedrooms, bathrooms, seed, ceiling_h, slab, t_ext, t_int,
 
     plan.villa = {
         "style": style, "pitch": pitch, "knee": knee, "ridge_z": ridge_z,
-        "bay": front_upper[0], "bay_ground": front_ground,
+        "bay": front_upper[0], "bay_ground": front_ground, "stone_corner": stone_corner,
     }
     return plan

@@ -13,6 +13,7 @@ from ..core import ui as cs_ui
 from . import cottage_layout as cl
 from . import cottage_paint
 from . import fence
+from . import podium
 from . import quay
 from . import shop_ui
 from . import villa_layout as vl
@@ -235,6 +236,9 @@ class HOUSEGEN_PT_panel(Panel):
         sub.enabled = s.add_lights
         sub.prop(s, "light_power")
 
+        if s.building_type in podium.TYPES:
+            podium.draw(layout, s)
+
         rbox = layout.box()
         rc = rbox.column(align=True)
         if shops:
@@ -249,6 +253,10 @@ class HOUSEGEN_PT_panel(Panel):
             r = rbox.row(align=True)
             r.prop(s, "villa_site", toggle=True)
             r.prop(s, "villa_pool", toggle=True)
+            if s.villa_pool:
+                pc = rbox.column(align=True)
+                pc.prop(s, "pool_length")
+                pc.prop(s, "pool_width")
         else:
             rbox.prop(s, "roof_type")
         if villa or cottage or shops:

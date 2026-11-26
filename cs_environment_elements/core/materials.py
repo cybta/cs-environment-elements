@@ -75,14 +75,16 @@ def _load_image(path, non_color=False):
     return img
 
 
-def _uv_metric(me, scale_for=None, z0=0.0):
+def _uv_metric(me, scale_for=None, z0=0.0, z0_for=None):
     """UVs in metres (1 UV unit = 1 m), projected onto each face's own plane.
 
     Matches the neighborhood scene, whose materials scale UVs to life size.
     U runs horizontally along the face and V up it (up the slope on roofs), so
     textures line up across neighbouring wall pieces. `scale_for(material)`
     can give a per-material multiplier (e.g. tiles that are 0.6 m per repeat).
-    `z0` is the height V is measured from, so wall tiles start at each storey's floor.
+    `z0` is the height V is measured from, so wall tiles start at each storey's floor;
+    `z0_for(material)` (if given) says which materials that applies to: the others keep V = height,
+    so facade cladding runs on unbroken from one storey to the next.
     """
     from mathutils import Vector
 
@@ -95,12 +97,15 @@ def _uv_metric(me, scale_for=None, z0=0.0):
         else:
             t = up.cross(n).normalized()
             b = n.cross(t)
-        k = 1.0
-        if scale_for and poly.material_index < len(me.materials):
-            k = scale_for(me.materials[poly.material_index])
+        k, zz = 1.0, z0
+        mat = me.materials[poly.material_index] if poly.material_index < len(me.materials) else None
+        if scale_for and mat is not None:
+            k = scale_for(mat)
+        if z0_for is not None and not z0_for(mat):
+            zz = 0.0
         for li in poly.loop_indices:
             v = me.vertices[me.loops[li].vertex_index].co
-            uv.data[li].uv = (v.dot(t) * k, (v.dot(b) - z0 * b.z) * k)
+            uv.data[li].uv = (v.dot(t) * k, (v.dot(b) - zz * b.z) * k)
 
 
 def _material(name, color, glass=False):

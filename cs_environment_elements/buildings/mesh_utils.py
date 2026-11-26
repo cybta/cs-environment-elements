@@ -31,7 +31,7 @@ def _obj(name, data, coll, parent, mats=(), uv_z=0.0):
         if m is not None:
             data.materials.append(m)
     if isinstance(data, bpy.types.Mesh) and not data.uv_layers:
-        _uv_metric(data, nm.uv_scale, uv_z)
+        _uv_metric(data, nm.uv_scale, uv_z, nm.uv_from_floor)
     return ob
 
 

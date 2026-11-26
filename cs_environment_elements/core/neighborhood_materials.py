@@ -43,6 +43,29 @@ RECIPES = {
     "C_bath_tile_floor": dict(tex="house3_tile_floor_v2", ext="png", base=(1.0, 1.0, 1.0), rough=0.45),
     "C_bath_tile_wall": dict(tex="house3_tile_wall_v2", ext="png", base=(1.0, 1.0, 1.0), rough=0.25),
     "C_door_wood": dict(tex="wood_table_001", scale=0.8, base=(0.8, 0.8, 0.8), rough=0.5, hsv=(0.53, 0.75, 2.0)),
+    # Whole-leaf door pictures (user's, 2026-11-26): each fills one leaf face (buildings/door_leaf.py UVs)
+    "C_door_white": dict(tex="door_white", scale=1.0, base=(0.85, 0.84, 0.82), rough=0.45),
+    "C_door_house": dict(tex="door_house", scale=1.0, base=(0.2, 0.18, 0.17), rough=0.4),
+    "C_door_villa_modern": dict(tex="door_villa_modern", scale=1.0, base=(0.3, 0.31, 0.33), rough=0.4),
+    "C_door_villa_gable": dict(tex="door_villa_gable", scale=1.0, base=(0.55, 0.36, 0.2), rough=0.45),
+    # Mediterranean villa (user's pictures, 2026-11-26): the arched studded door and a louvred shutter
+    # (each fitted to the whole leaf), and travertine for the stone round the doors and windows
+    "C_door_villa_med": dict(tex="door_villa_med", scale=1.0, base=(0.36, 0.23, 0.14), rough=0.5),
+    "C_shutter_villa_med": dict(tex="shutter_villa_med", scale=1.0, base=(0.24, 0.15, 0.1), rough=0.55),
+    # Gable villa (user's pictures, 2026-11-26): vertical oak slats on the bay, dark standing-seam
+    # metal on the roof, dark stacked stone round the ground floor
+    "C_villa_cladding": dict(tex="villa_cladding", scale=0.5, base=(0.6, 0.4, 0.22), rough=0.6),
+    "C_roof_metal_seam": dict(tex="roof_metal_seam", scale=0.2, base=(0.22, 0.24, 0.26), rough=0.7),
+    "C_wall_slate": dict(tex="wall_slate", scale=0.5, base=(0.25, 0.25, 0.26), rough=0.85),
+    # Modern villa (user's picture, 2026-11-26): travertine cladding panels with dark joints on the bay,
+    # ~4.5 m of panels per repeat (user: bigger, 2026-11-26); the gable villa's slats, darkened, on the carport walls
+    "C_villa_travertine_panel": dict(tex="villa_travertine_panel", scale=(1 / 3.4, 1 / 4.5), base=(0.78, 0.7, 0.58),
+                                     rough=0.6),
+    "C_villa_slats_dark": dict(tex="villa_cladding", scale=0.5, base=(0.14, 0.12, 0.11), rough=0.6,
+                               tint=(0.17, 0.15, 0.14)),
+    # 60 cm travertine tiles with fine joints (made from the travertine picture), 1.8 m per repeat
+    "C_terrace_tiles": dict(tex="villa_terrace_tiles", scale=1 / 1.8, base=(0.8, 0.74, 0.62), rough=0.6),
+    "C_villa_travertine": dict(tex="villa_travertine", scale=1.0, base=(0.8, 0.7, 0.55), rough=0.8),
     # Roofs
     "C_roof_red": dict(tex="clay_roof_tiles_02", scale=0.5, base=(0.6, 0.18, 0.12), rough=0.7),
     "C_roof_dark": dict(tex="grey_roof_tiles", scale=0.5, base=(0.18, 0.2, 0.23), rough=0.7, tint=(0.55, 0.58, 0.62)),
@@ -86,7 +109,10 @@ RECIPES = {
     # (2 m square, baked by tools/make_villa_textures.py) on the stone-clad walls
     "C_villa_stucco": dict(tex="white_stucco", scale=0.333, base=(0.9, 0.87, 0.8), rough=0.9,
                            tint=(1.2, 1.15, 1.04)),
-    "C_villa_ashlar": dict(tex="villa_ashlar", scale=0.5, base=(0.8, 0.75, 0.65), rough=0.8),
+    # Coursed sandstone blocks (user's picture, 2026-11-26; replaced the old ashlar): ~3.2 x 1.6 m per
+    # repeat, normal / roughness made from the picture (stones proud, joints sunk), normal pushed up
+    "C_villa_ashlar": dict(tex="villa_ashlar", scale=(1 / 3.2, 1 / 1.6), base=(0.8, 0.72, 0.58), rough=0.8,
+                           nor_strength=1.6),
     # new terracotta barrel tiles (from the user's photo, tools/make_villa_textures.py): the map is
     # 2.53 x 2.28 m, 12 columns of about 21 cm across
     "C_villa_roof_clay": dict(tex="villa_roof_tiles", scale=(1 / 2.526, 1 / 2.282), base=(0.566, 0.185, 0.081),
@@ -178,6 +204,9 @@ _RANDOM = ("RANDOM", "Random", "Picked from the house seed")
 # keep their choice
 FACADES_EXTRA = (
     ("STONE", "Stone", "C_wall_stone"),
+    ("ASHLAR", "Limestone Ashlar", "C_villa_ashlar"),     # the raised podium's cladding (user, 2026-11-26)
+    ("CLADDING", "Timber Slats", "C_villa_cladding"),
+    ("SLATE", "Dark Stacked Stone", "C_wall_slate"),
 )
 # Inner walls of houses and villas (not cottages or shops): the finished plaster the Mediterranean villa
 # was built with is the default
@@ -193,7 +222,8 @@ def inner_wall(key):
 
 
 FACADE_ITEMS = [_RANDOM] + [(k, n, m) for k, n, m in FACADES + FACADES_EXTRA]
-ROOF_ITEMS = [_RANDOM] + [(k, n, m) for k, n, m in ROOFS + SHINGLES]      # appended: saved files keep their choice
+METAL_ROOFS = (("METAL", "Standing Seam Metal", "C_roof_metal_seam"),)    # the gable villa's own (Random)
+ROOF_ITEMS = [_RANDOM] + [(k, n, m) for k, n, m in ROOFS + SHINGLES + METAL_ROOFS]      # appended: saved files keep their choice
 _CUSTOM = ("CUSTOM", "Custom", "Any colour from the colour picker")
 COTTAGE_ROOF_ITEMS = [_RANDOM] + [(k, n, f"{n} sheet") for k, n, _ in COTTAGE_ROOFS] + [_CUSTOM]
 COTTAGE_PAINT_ITEMS = [_RANDOM] + [(k, n, f"Weathered {n.lower()} paint") for k, n, _, _ in COTTAGE_PAINTS] \
@@ -204,6 +234,12 @@ COTTAGE_SIDING_ITEMS = [_RANDOM, ("LAP", "Lap Boards", "Horizontal clapboard sid
 
 def uv_scale(mat):
     return UV_SCALE.get(mat.name, 1.0) if mat else 1.0
+
+
+def uv_from_floor(mat):
+    """Tiles start afresh at each storey's floor (bathroom walls); everything else (facade
+    render, stone and timber cladding) lines up across storeys."""
+    return mat is not None and "tile" in mat.name.lower()
 
 
 # --------------------------------------------------------------------------
@@ -336,6 +372,7 @@ def _build_textured(name, r):
     if nor:
         nmap = nt.nodes.new("ShaderNodeNormalMap")
         nmap.location = (-150, -300)
+        nmap.inputs["Strength"].default_value = r.get("nor_strength", 1.0)
         nt.links.new(nor.outputs["Color"], nmap.inputs["Color"])
         nt.links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
     return mat
@@ -395,6 +432,15 @@ def _build_smoked_glass(name):
     return mat
 
 
+def _build_glow(name, color=(1.0, 0.72, 0.42), strength=6.0):
+    """Warm lamp glass: lit even with no light in the scene."""
+    mat, nt, bsdf = _new(name, color, 0.4)
+    for key, value in (("Emission Color", (*color, 1.0)), ("Emission", (*color, 1.0)), ("Emission Strength", strength)):
+        if key in bsdf.inputs:
+            bsdf.inputs[key].default_value = value
+    return mat
+
+
 def _build_metal(name, base, rough, metal):
     mat, nt, bsdf = _new(name, base, rough)
     bsdf.inputs["Metallic"].default_value = metal
@@ -415,6 +461,10 @@ _SPECIAL = {
     "C_villa_stair_glass": _build_smoked_glass,
     "C_villa_stair_post": lambda n: _new(n, (0.017, 0.017, 0.017), 0.5)[0],
     "C_villa_limestone": lambda n: _build_smooth(n, (0.68, 0.6, 0.47), 0.75, 0.2),    # sills, bands, arch surrounds
+    "C_lamp_glow": _build_glow,
+    "C_shrub_light": lambda n: _new(n, (0.1, 0.22, 0.05), 0.8)[0],
+    "C_mulch": lambda n: _new(n, (0.08, 0.055, 0.04), 0.95)[0],
+    "C_cushion": lambda n: _new(n, (0.85, 0.83, 0.78), 0.85)[0],
     "C_cottage_pile": lambda n: _build_metal(n, (0.09, 0.07, 0.06), 0.75, 0.5),      # rusty steel piles
 }
 
@@ -457,7 +507,7 @@ def house_palette(facade="RANDOM", roof="RANDOM", seed=0, bath_tiles=True):
     rand_facade = rng.choice(FACADES)[2]   # always draw both, so fixing one
     rand_roof = rng.choice(SHINGLES)[2]    # choice doesn't reshuffle the other
     facade_mat = rand_facade if facade == "RANDOM" else dict((k, m) for k, _, m in FACADES + FACADES_EXTRA)[facade]
-    roof_mat = rand_roof if roof == "RANDOM" else dict((k, m) for k, _, m in SHINGLES + ROOFS)[roof]
+    roof_mat = rand_roof if roof == "RANDOM" else dict((k, m) for k, _, m in SHINGLES + ROOFS + METAL_ROOFS)[roof]
 
     plaster = ensure("C_interior_plaster")
     floor = ensure("C_floor_wood")
@@ -505,21 +555,50 @@ def villa_palette(style, facade="RANDOM", roof="RANDOM", seed=0, bath_tiles=True
         "paving": ensure("C_sidewalk"),
         "drive": ensure("C_path"),
         "water": ensure("C_water"),
+        "pool_edge": ensure("C_villa_ashlar"),     # the same stone as the raised podium
         "stair_glass": ensure("C_villa_stair_glass"),
         "stair_post": ensure("C_villa_stair_post"),
     })
+    if not med:     # the garden, lights and pool-side things of villa_dress
+        m.update({
+            "fascia": ensure("C_villa_trim"),            # dark roof edges, gutters, lamps, window boxes
+            "lamp": ensure("C_lamp_glow"),
+            "shrub": ensure("C_hedge_leaves"),
+            "shrub_light": ensure("C_shrub_light"),
+            "mulch": ensure("C_mulch"),
+            "gravel": ensure("C_world_gravel"),
+            "footing": ensure("C_plinth"),
+            "cushion": ensure("C_cushion"),
+        })
+    if style == "MODERN":
+        m.update({
+            "accent": ensure("C_villa_travertine_panel"),    # the bay and the stone blade
+            "soffit_wood": ensure("C_villa_cladding"),       # oak slats under the roof's overhang
+            "carport_wall": ensure("C_villa_slats_dark"),
+            "deck_stone": ensure("C_terrace_tiles"),         # the back terrace
+        })
+    if style == "GABLE":
+        m.update({
+            "accent": ensure("C_villa_cladding"),        # the bay and the wall behind the balcony
+            "base_stone": ensure("C_wall_slate"),        # the rest of the ground floor
+            "soffit": ensure("C_villa_cladding"),        # timber under the eaves and the carport roof
+        })
+        if roof == "RANDOM":
+            m["roof"] = ensure("C_roof_metal_seam")
     if med:
         m.update({
-            "limestone": ensure("C_villa_limestone"),
+            "limestone": ensure("C_villa_travertine"),     # door and window surrounds, sills, heads
             "rafter": ensure("C_villa_timber"),
             "paving": ensure("C_path"),
             "planter_top": ensure("C_hedge_leaves"),
         })
     if facade == "RANDOM":
         m["wall_out"] = ensure("C_villa_stucco" if med else "C_villa_render")
+        if style == "GABLE":    # oak slats everywhere above the stone (user: more wood, less white)
+            m["wall_out"] = m["accent"]
     if med:
         # eaves between the timber rafter tails in the facade's render (stucco under a stone house)
-        m["soffit"] = ensure("C_villa_stucco") if facade == "STONE" else m["wall_out"]
+        m["soffit"] = ensure("C_villa_stucco") if facade in ("STONE", "ASHLAR") else m["wall_out"]
         if roof in ("RANDOM", "RED"):
             m["roof"] = ensure("C_villa_roof_clay")
     m.pop("roof_edge", None)
