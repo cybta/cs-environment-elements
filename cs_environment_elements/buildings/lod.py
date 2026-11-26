@@ -27,16 +27,19 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 # level -> part filter: drop a part whose middle size < thin, or longest x middle < area (m²);
-# 'cards' drops what the cards replace (boards, slats, rails: anything under 5 cm thick)
+# 'cards' drops what the cards replace (boards, slats, rails: anything under 5 cm thick);
+# 'slim' (fences only, see build): a part thinner than this keeps only its two broad faces and its top: the
+# thin sides and the bottom of a 2 cm board are ~2 px wide at LOD1's 25 m+, and they are ~40 % of a fence
 LEVELS = {
-    1: dict(thin=0.0, area=0.004, cards=False),
-    2: dict(thin=0.035, area=0.08, cards=True),
-    3: dict(thin=0.1, area=0.35, cards=True),
+    1: dict(thin=0.0, area=0.004, cards=False, slim=0.04),
+    2: dict(thin=0.035, area=0.08, cards=True, slim=0.0),
+    3: dict(thin=0.1, area=0.35, cards=True, slim=0.0),
 }
 CARD_THICK = 0.05
 GLASS_NAMES = {"C_window_glass", "C_villa_stair_glass", "RoomGen_Glass", "C_villa_stair_glass"}
 LOD_GLASS = "C_window_lod"
 RAY_FAR = 500.0
+WEAR_UV = "WearUV"      # fence_geom.WEAR_UV (kept through the LODs)
 TILT = 1.2              # side rays lean ~50 degrees off the normal
 
 
@@ -128,6 +131,15 @@ def part_size(pts, normals):
     return sorted((a, b, c))
 
 
+def thin_axis(pts, normals):
+    """The face normal across which a part is thinnest."""
+    def extent(d):
+        vals = [p.dot(d) for p in pts]
+        return max(vals) - min(vals)
+
+    return min(normals, key=extent)
+
+
 def _keep_part(size, spec):
     if spec["cards"] and size[0] < CARD_THICK:
         return False
@@ -135,10 +147,12 @@ def _keep_part(size, spec):
 
 
 class Soup:
-    """Faces from many objects in the root's space: verts, faces, per-loop UVs, material per face."""
+    """Faces from many objects in the root's space: verts, faces, per-loop UVs, material per face, and the
+    fences' second UV layer (fence_geom.WEAR_UV) where the source had one."""
 
     def __init__(self):
         self.verts, self.faces, self.uvs, self.mat_of = [], [], [], []
+        self.wear = {}                     # face index -> per-loop WearUV
         self.mats = []
 
     def mat_index(self, mat):
@@ -146,11 +160,13 @@ class Soup:
             self.mats.append(mat)
         return self.mats.index(mat)
 
-    def add_face(self, pts, uvs, mat):
+    def add_face(self, pts, uvs, mat, wear=None):
         b = len(self.verts)
         self.verts += [Vector(p) for p in pts]
         self.faces.append(list(range(b, b + len(pts))))
         self.uvs.append([tuple(u) for u in uvs])
+        if wear is not None:
+            self.wear[len(self.faces) - 1] = [tuple(w) for w in wear]
         self.mat_of.append(self.mat_index(mat))
 
 
@@ -173,17 +189,28 @@ def gather(root, objs, spec, soup):
             seen = nors.setdefault(part[p.vertices[0]], [])
             if n.length > 0.5 and len(seen) < 12 and all(abs(n.dot(q)) < 0.999 for q in seen):
                 seen.append(n)
-        keep = {pid: _keep_part(part_size(pts[pid], nors.get(pid) or [Vector((0, 0, 1))]), spec) for pid in pts}
+        sizes = {pid: part_size(pts[pid], nors.get(pid) or [Vector((0, 0, 1))]) for pid in pts}
+        keep = {pid: _keep_part(sizes[pid], spec) for pid in pts}
+        slim = {pid: thin_axis(pts[pid], nors[pid]) for pid in pts
+                if spec.get("slim") and nors.get(pid) and sizes[pid][0] < spec["slim"]}
         uvl = me.uv_layers.active.data if me.uv_layers.active else None
+        wl = me.uv_layers.get(WEAR_UV)
+        wl = wl.data if wl is not None else None
         slots = [s.material for s in ob.material_slots] or [None]
         for p in me.polygons:
-            if not keep[part[p.vertices[0]]]:
+            pid = part[p.vertices[0]]
+            if not keep[pid]:
                 continue
+            if pid in slim:                          # a board: the broad faces and the top only
+                n = (rot @ p.normal).normalized()
+                if abs(n.dot(slim[pid])) < 0.9 and n.z < 0.5:
+                    continue
             mat = slots[min(p.material_index, len(slots) - 1)]
             if _is_glass(mat):
                 mat = glass
             uvs = [uvl[li].uv for li in p.loop_indices] if uvl else [(0.0, 0.0)] * len(p.vertices)
-            soup.add_face([co[v] for v in p.vertices], uvs, mat)
+            wear = [wl[li].uv for li in p.loop_indices] if wl else None
+            soup.add_face([co[v] for v in p.vertices], uvs, mat, wear)
 
 
 # --------------------------------------------------------------------------
@@ -253,6 +280,14 @@ def to_mesh(name, soup, faces):
         for u in soup.uvs[fi]:
             uv.data[li].uv = u
             li += 1
+    if soup.wear:
+        wear = me.uv_layers.new(name=WEAR_UV)
+        li = 0
+        for fi in faces:
+            for u in soup.wear.get(fi, soup.uvs[fi]):
+                wear.data[li].uv = u
+                li += 1
+        uv.active = uv.active_render = True
     for m in soup.mats:
         me.materials.append(m)
     me.polygons.foreach_set("material_index", [soup.mat_of[fi] for fi in faces])
@@ -323,6 +358,7 @@ def build(root, levels=(1, 2, 3)):
     for lv in levels:
         spec = dict(LEVELS[lv])
         spec["cards"] = spec["cards"] and bool(cards)
+        spec["slim"] = spec["slim"] if cards else 0.0      # fences (they have cards); buildings keep their edges
         soup = Soup()
         gather(root, src, spec, soup)
         faces = cull_hidden(soup)

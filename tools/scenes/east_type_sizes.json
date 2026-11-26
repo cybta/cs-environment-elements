@@ -1,0 +1,167 @@
+[
+ {
+  "type": "HOUSE",
+  "area": 100,
+  "shops": null,
+  "walls": [
+   11.7,
+   8.6
+  ],
+  "overall": [
+   13.3,
+   10.2
+  ],
+  "height": 5.9,
+  "floors": 1
+ },
+ {
+  "type": "HOUSE",
+  "area": 130,
+  "shops": null,
+  "walls": [
+   9.3,
+   7.0
+  ],
+  "overall": [
+   11.0,
+   8.6
+  ],
+  "height": 8.3,
+  "floors": 2
+ },
+ {
+  "type": "HOUSE",
+  "area": 200,
+  "shops": null,
+  "walls": [
+   11.7,
+   8.6
+  ],
+  "overall": [
+   13.3,
+   10.2
+  ],
+  "height": 8.8,
+  "floors": 2
+ },
+ {
+  "type": "VILLA_MODERN",
+  "area": 200,
+  "shops": null,
+  "walls": [
+   10.0,
+   12.0
+  ],
+  "overall": [
+   10.9,
+   21.1
+  ],
+  "height": 6.4,
+  "floors": 2
+ },
+ {
+  "type": "VILLA_MODERN",
+  "area": 240,
+  "shops": null,
+  "walls": [
+   10.2,
+   13.7
+  ],
+  "overall": [
+   11.1,
+   22.8
+  ],
+  "height": 6.4,
+  "floors": 2
+ },
+ {
+  "type": "VILLA_MODERN",
+  "area": 320,
+  "shops": null,
+  "walls": [
+   11.6,
+   15.6
+  ],
+  "overall": [
+   12.5,
+   24.7
+  ],
+  "height": 6.4,
+  "floors": 2
+ },
+ {
+  "type": "VILLA_GABLE",
+  "area": 170,
+  "shops": null,
+  "walls": [
+   9.1,
+   10.7
+  ],
+  "overall": [
+   15.4,
+   19.8
+  ],
+  "height": 8.7,
+  "floors": 2
+ },
+ {
+  "type": "VILLA_GABLE",
+  "area": 200,
+  "shops": null,
+  "walls": [
+   9.7,
+   11.7
+  ],
+  "overall": [
+   16.0,
+   20.8
+  ],
+  "height": 9.0,
+  "floors": 2
+ },
+ {
+  "type": "VILLA_GABLE",
+  "area": 260,
+  "shops": null,
+  "walls": [
+   10.9,
+   13.2
+  ],
+  "overall": [
+   17.2,
+   22.3
+  ],
+  "height": 9.5,
+  "floors": 2
+ },
+ {
+  "type": "SHOPS",
+  "area": 0,
+  "shops": 3,
+  "walls": [
+   19.8,
+   10.0
+  ],
+  "overall": [
+   21.5,
+   13.6
+  ],
+  "height": 9.8,
+  "floors": 2
+ },
+ {
+  "type": "SHOPS",
+  "area": 0,
+  "shops": 4,
+  "walls": [
+   25.3,
+   10.0
+  ],
+  "overall": [
+   27.0,
+   13.6
+  ],
+  "height": 9.8,
+  "floors": 2
+ }
+]

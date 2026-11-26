@@ -1,4 +1,5 @@
-"""Villa exteriors: everything house.py's walls and floors don't cover.
+"""Villa exteriors: everything house.py's walls and floors don't cover (the Mediterranean
+villa's are in villa_med, which reuses the frames, site and pool from here).
 
 Roofs (a flat slab with a deep overhang, or a steep gable with skylights),
 window frames, the carport, balcony rails, the entrance, and the driveway
@@ -48,6 +49,10 @@ class _Ctx:
 def build_exterior(s, plan, mats, coll, root, name, center):
     c = _Ctx(s, plan, mats, coll, root, name, center)
     root["villa_style"] = plan.villa["style"]
+    if plan.villa["style"] == "MEDITERRANEAN":     # arcade, arches, hip roof: its own module
+        from . import villa_med
+        villa_med.build(c)
+        return
     _frames(c)
     _open_air(c)
     _entrance(c)
@@ -71,8 +76,8 @@ def _frames(c, fw=0.05, depth=0.08):
     for f in c.plan.floors:
         boxes = []
         for o in f.openings:
-            if not o.exterior or o.kind not in ("WINDOW", "PATIO"):
-                continue
+            if not o.exterior or o.kind not in ("WINDOW", "PATIO") or getattr(o, "round", False):
+                continue        # (a round-topped opening gets its frame from villa_med)
 
             def bar(s0, s1, z0, z1):
                 b = _wall_box(o.axis, o.coord, depth, s0, s1, z0, z1)
@@ -260,7 +265,7 @@ def _carport_wing(c, width=5.6, depth=6.0, setback=0.9):
 # Around the house
 # --------------------------------------------------------------------------
 
-def _site(c):
+def _site(c, path_half=0.7):
     W, D, te, G, m = c.W, c.D, c.te, c.G, c.mats
     if c.drive:
         x0, x1, y = c.drive
@@ -268,14 +273,16 @@ def _site(c):
     ent = next((o for o in c.ground.openings if o.kind == "ENTRANCE"), None)
     if ent:
         mid = (ent.s0 + ent.s1) / 2
-        c.add("FrontPath", [(mid - 0.7, -FRONT_YARD, G, mid + 0.7, -te / 2 - 1.0, G + 0.04)], m["paving"])
+        c.add("FrontPath", [(mid - path_half, -FRONT_YARD, G, mid + path_half, -te / 2 - 1.0, G + 0.04)], m["paving"])
     c.add("BackPatio", [(-te / 2, D + te / 2, G, W + te / 2, D + te / 2 + 3.0, G + 0.04)], m["paving"])
 
 
-def _pool(c, width=4.0, length=8.0, rim=0.4):
+def _pool(c, width=4.0, length=8.0, rim=0.4, along=False):
+    """`along`: the long side parallel to the back of the house (the Mediterranean villa)."""
     W, D, te, G, m = c.W, c.D, c.te, c.G, c.mats
-    x0, y0 = W / 2 - width / 2, D + te / 2 + 4.0
-    x1, y1 = x0 + width, y0 + length
+    wx, wy = (length, width) if along else (width, length)
+    x0, y0 = W / 2 - wx / 2, D + te / 2 + 4.0
+    x1, y1 = x0 + wx, y0 + wy
     c.add("PoolEdge", [
         (x0 - rim, y0 - rim, G, x1 + rim, y0, G + 0.1), (x0 - rim, y1, G, x1 + rim, y1 + rim, G + 0.1),
         (x0 - rim, y0, G, x0, y1, G + 0.1), (x1, y0, G, x1 + rim, y1, G + 0.1),

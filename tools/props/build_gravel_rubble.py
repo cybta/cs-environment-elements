@@ -15,9 +15,13 @@ The mound's edge runs a little below the floor (z < 0) so it sinks into uneven g
 Writes cs_environment_elements/props/assets/rubble/:
   gravel_rubble.blend
   textures/gravel_rubble_diff.jpg   (the photo, copied)
-  textures/gravel_rubble_nor_gl.jpg, gravel_rubble_rough.jpg   (derived from the photo)
+  textures/gravel_rubble_nor_gl.jpg, gravel_rubble_rough.jpg   (derived from the photo; the normal map is the
+                                                                 relief: every pebble a dome, deep gaps)
   textures/rubble_stone_diff_1k.png, _rough_1k.png, _nor_gl_1k.png   (generated)
 and, unless RENDER=0, render/gravel_rubble.png beside this script.
+The relief ("bump") is in the normal maps, not in a Bump node, so glTF carries it into a game (normalTexture);
+their strength is set from the maps themselves (slope_scale): the steepest tenth leans ~54 degrees on
+the gravel, ~45 on the stones.
 Headless:  blender -b --factory-startup --python build_gravel_rubble.py
 """
 import os, math, random, shutil
@@ -45,6 +49,11 @@ def blur(a, sigma):
     fy, fx = np.fft.fftfreq(h)[:, None], np.fft.fftfreq(w)[None, :]
     k = np.exp(-2 * (math.pi * sigma) ** 2 * (fx ** 2 + fy ** 2))
     return np.real(np.fft.ifft2(np.fft.fft2(a) * k))
+
+def slope_scale(hgt, steep):
+    """Strength for normal_from so the steepest 10 % of the surface leans about atan(steep)."""
+    g = np.hypot(np.roll(hgt, -1, 1) - np.roll(hgt, 1, 1), np.roll(hgt, -1, 0) - np.roll(hgt, 1, 0))
+    return steep / (np.percentile(g, 90) + 1e-9)
 
 def normal_from(hgt, strength):
     dx = (np.roll(hgt, -1, 1) - np.roll(hgt, 1, 1)) * strength
@@ -79,11 +88,18 @@ def gravel_maps():
     print("gravel photo %dx%d  seam L|R %.3f  T|B %.3f  (neighbouring columns %.3f)" % (
         w, h, np.abs(lum[:, 0] - lum[:, -1]).mean(), np.abs(lum[0] - lum[-1]).mean(),
         np.abs(lum[:, w // 2] - lum[:, w // 2 + 1]).mean()))
-    # stones are lit and lighter than the sand between them, so a blurred luminance makes
-    # a usable height: broad shapes (stones) plus a little fine grain
-    hgt = blur(lum, 6.0) * 0.7 + blur(lum, 1.5) * 0.3
-    hgt = (hgt - hgt.min()) / (hgt.max() - hgt.min())
-    save("gravel_rubble_nor_gl.jpg", normal_from(hgt, 9.0), "JPEG")
+    # The relief: stones are lit and lighter than the shadowed gaps round them, so the local contrast
+    # (luminance minus its surroundings, at the pebbles' size: 15-40 px) marks each stone; squashed and blurred
+    # a little it makes a rounded dome with steep sides. Plus gentle humps and the photo's fine grain.
+    local = blur(lum, 1.2) - blur(lum, 12.0)
+    local /= np.percentile(np.abs(local), 98) + 1e-9
+    domes = blur(np.tanh(local * 1.5), 2.0)
+    rise = blur(lum, 40.0)
+    rise = (rise - rise.mean()) / (np.percentile(np.abs(rise - rise.mean()), 98) + 1e-9)
+    grain = lum - blur(lum, 1.0)
+    grain /= np.percentile(np.abs(grain), 98) + 1e-9
+    hgt = domes + 0.35 * rise + 0.12 * grain
+    save("gravel_rubble_nor_gl.jpg", normal_from(hgt, slope_scale(hgt, 1.4)), "JPEG")
     cavity = np.clip((blur(lum, 4.0) - lum) * 4 + 0.5, 0, 1)      # dark gaps between stones
     save("gravel_rubble_rough.jpg", 0.72 + 0.2 * cavity, "JPEG")
 
@@ -121,7 +137,10 @@ def stone_maps():
     c = lerp(c, col((0.52, 0.46, 0.38)), dust * 0.35)
     save("rubble_stone_diff_1k.png", c)
     save("rubble_stone_rough_1k.png", 0.7 + 0.15 * fine + 0.1 * pit)
-    save("rubble_stone_nor_gl_1k.png", normal_from(fine * 0.6 + speck * 0.2 - pit * 0.5, 4.0))
+    lumps = fbm(27, 2.6, lo=4.0)                                   # the rock's own lumps, a few cm
+    ridges = (1 - np.abs(fbm(28, 2.2, lo=6.0) * 2 - 1)) ** 3       # fracture lines
+    hgt = 0.55 * lumps + 0.18 * ridges + 0.22 * fine + 0.08 * speck - 0.6 * pit
+    save("rubble_stone_nor_gl_1k.png", normal_from(hgt, slope_scale(hgt, 1.0)))
 
 def textured(name, maps, normal_strength):
     mat = bpy.data.materials.new(name); mat.use_nodes = True
@@ -293,7 +312,7 @@ stone_maps()
 MATS = [textured("GravelRubble", {"Base Color": "gravel_rubble_diff.jpg", "Roughness": "gravel_rubble_rough.jpg",
                                   "Normal": "gravel_rubble_nor_gl.jpg"}, 1.0),
         textured("RubbleStone", {"Base Color": "rubble_stone_diff_1k.png", "Roughness": "rubble_stone_rough_1k.png",
-                                 "Normal": "rubble_stone_nor_gl_1k.png"}, 0.6)]
+                                 "Normal": "rubble_stone_nor_gl_1k.png"}, 1.0)]
 
 PIECES = [
     piece("GravelPileLarge", 3, 1.45, 0.95, 0.5, (0.25, 0.1), pebbles=170, chunks=8, chips=34, outside=70),

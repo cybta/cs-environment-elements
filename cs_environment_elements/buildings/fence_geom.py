@@ -3,6 +3,13 @@ assets/old-fence/fence.png (12 weathered planks stacked, transparent gaps betwee
 
 Every board, rail and post picks a plank strip and a random stretch along it, so no
 two boards look the same and no UV ever crosses a gap or a ragged plank end.
+
+A second UV layer, "WearUV" (glTF TEXCOORD_1, Godot UV2), holds where each spot is in metres, U along
+the grain and V across it: ((position - origin) . grain, (position - origin) . width direction).
+Neighbouring boards of a run continue each other, so the paint's weather patches (core/paint_nodes.py)
+run across several boards. The origin is the mesh's first part (shifted a little by where that is), so
+the values stay within the fence's size: Godot's default mesh compression stores UVs in 16 bits over
+their range (world metres, +-300, would be 1 cm steps, coarser than the paint flakes).
 """
 
 import os
@@ -13,6 +20,7 @@ from mathutils import Vector
 TEX_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "core", "assets", "old-fence", "fence.png")
 MAT_WOOD = "C_fence_old_wood"
 MAT_METAL = "C_fence_iron"
+WEAR_UV = "WearUV"
 
 _IMG_W, _IMG_H = 2584, 1966
 # Each plank: (top row, bottom row, first solid column, last solid column) in pixels,
@@ -41,6 +49,8 @@ class Parts:
     def __init__(self, rng):
         self.rng = rng
         self.verts, self.faces, self.uvs, self.mats = [], [], [], []
+        self.wear = {}                     # face index -> per-loop WearUV (metres); others reuse their UVs
+        self.wear_origin = None
 
     def _quad(self, corners, uvs, mat):
         base = len(self.verts)
@@ -116,7 +126,19 @@ class Parts:
                     self.uvs.append([metric_uv(Vector(self.verts[idx[s]]), nrm) for s in ring])
                 else:
                     self.uvs.append([uv_of(s, axis) for s in ring])
+                o = self._wear_origin(center)
+                self.wear[len(self.faces) - 1] = [((Vector(self.verts[idx[s]]) - o).dot(a),
+                                                   (Vector(self.verts[idx[s]]) - o).dot(b)) for s in ring]
                 self.mats.append(mat)
+
+    def _wear_origin(self, p):
+        """Where WearUV is measured from: the first part, shifted by up to 6.3 m (the weather patches' size)
+        from where it stands, so fences do not all start on the same patch. No rng draw: the planks stay."""
+        if self.wear_origin is None:
+            x, y = p.x, p.y
+            self.wear_origin = Vector(p) - Vector(((x * 0.37 + y * 0.61) % 6.3, (x * 0.53 - y * 0.29) % 6.3,
+                                                   (x * 0.71 + y * 0.23) % 2.7))
+        return self.wear_origin
 
     def upright(self, base, along, width, thick, height, mat=0, uv="plank"):
         """A vertical board/post standing on `base` (bottom centre), face along `along`."""
@@ -139,11 +161,16 @@ class Parts:
         me = bpy.data.meshes.new(name)
         me.from_pydata(self.verts, [], self.faces)
         uv = me.uv_layers.new(name="UVMap")
+        wear = me.uv_layers.new(name=WEAR_UV)
         li = 0
-        for face_uvs in self.uvs:
-            for co in face_uvs:
+        for fi, face_uvs in enumerate(self.uvs):
+            face_wear = self.wear.get(fi, face_uvs)
+            for co, w in zip(face_uvs, face_wear):
                 uv.data[li].uv = co
+                wear.data[li].uv = w
                 li += 1
+        uv.active = True
+        uv.active_render = True
         for poly, m in zip(me.polygons, self.mats):
             poly.material_index = m
         me.update()

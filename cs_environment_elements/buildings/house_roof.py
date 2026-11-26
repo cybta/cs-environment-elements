@@ -4,7 +4,8 @@ import math
 
 from mathutils import Vector
 
-from .mesh_utils import _boxes_mesh, _mat_index, _obj, _paint_by_normal, _solid
+from . import roof_edge
+from .mesh_utils import _boxes_mesh, _obj, _paint_by_normal, _solid
 
 
 # --------------------------------------------------------------------------
@@ -121,11 +122,9 @@ def _build_roof(s, plan, z0, coll, root, mats, name):
             v = [(y, x, z) for x, y, z in v]
         return v, f
 
-    # Tiles on top and on the edges, painted soffit boards underneath
-    me = _solid(f"{name}_Roof", *orient(roof))
-    i_roof, i_soffit = _mat_index(me, mats["roof"]), _mat_index(me, mats["soffit"])
-    for p in me.polygons:
-        p.material_index = i_soffit if p.normal.z < -0.3 else i_roof
+    # Tiles on top, the roof's edge strip on the edges, painted soffit boards underneath
+    me = roof_edge.paint(_solid(f"{name}_Roof", *orient(roof)), mats)
     _obj(f"{name}_Roof", me, coll, root)
+    roof_edge.edge_uvs(me, mats)
     if walls:
         _obj(f"{name}_GableWalls", _solid(f"{name}_GableWalls", *orient(walls)), coll, root, [mats["wall_out"]])

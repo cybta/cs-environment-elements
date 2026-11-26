@@ -1,6 +1,7 @@
 """Villa floor plans. Pure Python, built on house_layout's rooms, doors and walls.
 
-Two styles, both two storeys with the street at the front (y = 0):
+Two styles here, both two storeys with the street at the front (y = 0); the third,
+MEDITERRANEAN, has its own module (villa_med_layout) built on these helpers:
 
 MODERN - a flat-roofed box, narrow and deep. A two-car carport is cut out of
 the ground floor's front corner, the upper floor runs over it, and a balcony
@@ -38,7 +39,7 @@ HALL = "Hallway"
 AREA = {"master": 20.0, "bedroom": 14.0, "bathroom": 6.0, "wc": 2.6, "study": 10.0, "storage": 4.0}
 MAX_AREA = {"bathroom": 9.0, "wc": 3.5, "storage": 7.0}
 
-MIN_AREA = {"MODERN": 185.0, "GABLE": 160.0}
+MIN_AREA = {"MODERN": 185.0, "GABLE": 160.0, "MEDITERRANEAN": 380.0}     # (villa_med_layout.MIN_AREA)
 
 
 class _Seg:
@@ -185,6 +186,12 @@ def make_villa_plan(style="MODERN", area=240.0, bedrooms=4, bathrooms=3, seed=0,
     saved = hl.MAX_AREA
     hl.MAX_AREA = MAX_AREA
     try:
+        if style == "MEDITERRANEAN":        # its own plan (villa_med_layout), on this module's helpers
+            try:
+                from . import villa_med_layout as med
+            except ImportError:
+                import villa_med_layout as med
+            return med.make(area, bedrooms, bathrooms, seed, ceiling_h, slab, t_ext, t_int)
         return _make(style, area, bedrooms, bathrooms, seed, ceiling_h, slab, t_ext, t_int, pitch, knee)
     finally:
         hl.MAX_AREA = saved

@@ -78,6 +78,16 @@ def _uv(kind, s, h, pitch):
     return s, h
 
 
+def _wear(kind, a, s, h, height):
+    """WearUV (fence_geom) in metres, U along the grain: up the boards of an "upright" card, along the run
+    otherwise (h is a 0..1 fraction on "upright" cards). Measured on the card (small values, see
+    fence_geom.Parts._wear_origin), shifted by where the card starts."""
+    k = (a.x * 0.37 + a.y * 0.61) % 6.3
+    if kind == "upright":
+        return h * height + k * 0.4, s + k
+    return s + k, h + k * 0.4
+
+
 def add(soup, cards):
     """Append the cards' faces to an lod.Soup."""
     for x0, y0, z0, x1, y1, z1, height, name, kind, pitch in cards:
@@ -94,4 +104,4 @@ def add(soup, cards):
             ring = quad if side > 0 else list(reversed(quad))
             pts = [p + n * (GAP / 2 * side) for p, _, _ in ring]
             uvs = [_uv(kind, s, h, pitch) for _, s, h in ring]
-            soup.add_face(pts, uvs, mat)
+            soup.add_face(pts, uvs, mat, [_wear(kind, a, s, h, height) for _, s, h in ring])

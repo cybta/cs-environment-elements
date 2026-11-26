@@ -4,19 +4,25 @@ Built to be cheap in a game, and the same in Blender and in Godot
 (core/assets/old-fence/godot/ has the shader and how to set it up):
 
 - fence.png               the planks, shared by every old fence (as before)
-- fence_paint_mask.png    one grey texture laid out like fence.png: how long the paint lasts
-                          at each spot (board edges first, patches along the grain), made by
-                          tools/make_fence_paint_mask.py; also shared by every fence
+- fence_paint_mask.png    one grey texture laid out like fence.png: board-level wear (board edges first,
+                          each plank its own age), made by tools/make_fence_paint_mask.py
+- wear_zones.png, paint_flakes.png   (core/assets/neighborhood) the cottages' weather patches and
+                          cracked flakes, read through the fence's second UV layer "WearUV" (metres,
+                          U along the grain; glTF TEXCOORD_1, Godot UV2), see core/paint_nodes.py
 - colour attribute "Paint" on every mesh of a fence (LODs too): RGB = the paint colour,
                           A = peeling (0 fresh .. 1 bare wood). glTF exports it as COLOR_0.
                           Written by core.paint, which the cottages share.
 
 So every old fence in the game uses ONE material, whatever its colour: no texture per
-colour, no extra draw calls, one more texture read per pixel. The shading:
+colour, no extra draw calls. The shading:
 
-    paint  = smoothstep(peel - SOFT, peel + SOFT, mask)        # 1 where paint is left
+    last   = paint_nodes.lasting(WearUV, mask)                 # how long the paint lasts here
+    paint  = smoothstep(peel - SOFT, peel + SOFT, last)        # 1 where paint is left
+    rim    = 1 - smoothstep(0, RIM, |last - peel|)             # dirty edge round each flake
+    crack  = paint_nodes.crack(last, peel, flakes.G)           # cracks just before it flakes
     grain  = mix(1, clamp(luma(wood) * 2.5, 0, 1), 0.35)       # the wood shows through a little
-    albedo = mix(wood, colour * grain, paint)
+    bare   = wood * PEELED_TINT                                # the timber cottages' old brown wood, painted or not
+    albedo = mix(bare, colour * grain * (1 - 0.18 rim) * crack, paint)
     rough  = mix(0.88, 0.6, paint)
 
 A fence without paint carries peel = 1 (bare wood), so it shares the material too.
@@ -33,9 +39,14 @@ from . import fence_geom as fg
 MAT = "C_fence_old_paint"
 ATTR = "Paint"
 SOFT = 0.03
-VERSION = 1
+RIM = 0.06
+VERSION = 5
 MASK_PATH = os.path.join(os.path.dirname(fg.TEX_PATH), "fence_paint_mask.png")
 WOOD_ROUGH, PAINT_ROUGH = 0.88, 0.6
+# fence.png times this (linear) = the timber cottages' wood (cottage_wood_diff.jpg mean colour): every bare
+# fence board, under peeled paint or never painted, is the same old brown wood as the cottages (user, 2026-11-23:
+# no pale, near-white wood)
+PEELED_TINT = (0.40, 0.36, 0.284)
 
 # Old outdoor paints, sRGB (what the colour picker shows)
 PALETTE = (
@@ -70,6 +81,9 @@ def _img(path, non_color):
 
 def material():
     """C_fence_old_paint: the planks with the paint mixed on from the "Paint" attribute."""
+    from ..core import neighborhood_materials as nm
+    from ..core import paint_nodes as pn
+
     mat = bpy.data.materials.get(MAT)
     if mat is not None and mat.get("paint_version") == VERSION:
         return mat
@@ -79,69 +93,44 @@ def material():
     mat.diffuse_color = (0.42, 0.37, 0.31, 1.0)
     nt = mat.node_tree
     nt.nodes.clear()
-    N, L = nt.nodes.new, nt.links.new
+    g = pn.Graph(nt)
+    L, math = g.link, g.math
 
-    def node(kind, x, y, **props):
-        n = N(kind)
-        n.location = (x, y)
-        for k, v in props.items():
-            setattr(n, k, v)
-        return n
-
-    def math(op, x, y, a=None, b=None, c=None):
-        n = node("ShaderNodeMath", x, y, operation=op)
-        for i, v in enumerate((a, b, c)):
-            if v is None:
-                continue
-            if isinstance(v, (int, float)):
-                n.inputs[i].default_value = v
-            else:
-                L(v, n.inputs[i])
-        return n.outputs[0]
-
-    out = node("ShaderNodeOutputMaterial", 900, 0)
-    bsdf = node("ShaderNodeBsdfPrincipled", 600, 0)
+    out = g.node("ShaderNodeOutputMaterial", 900, 0)
+    bsdf = g.node("ShaderNodeBsdfPrincipled", 600, 0)
     L(bsdf.outputs["BSDF"], out.inputs["Surface"])
-    wood = node("ShaderNodeTexImage", -900, 250, name="Wood", label="Wood (fence.png)", extension="EXTEND")
-    wood.image = _img(fg.TEX_PATH, False)
-    mask = node("ShaderNodeTexImage", -900, -150, name="PaintMask", label="Peel mask", extension="EXTEND")
-    mask.image = _img(MASK_PATH, True)
-    attr = node("ShaderNodeVertexColor", -900, -450, layer_name=ATTR, label="Paint (RGB colour, A peeling)")
-
+    uv = g.node("ShaderNodeUVMap", -1300, 250, uv_map="UVMap")
+    wood = g.image(-900, 250, _img(fg.TEX_PATH, False), uv.outputs["UV"], "Wood")
+    wood.extension = "EXTEND"
+    mask = g.image(-900, -150, _img(MASK_PATH, True), uv.outputs["UV"], "PaintMask")
+    mask.extension = "EXTEND"
+    wear = g.node("ShaderNodeUVMap", -2200, -900, uv_map=fg.WEAR_UV, label="WearUV (metres, U along the grain)")
+    flake_uv = g.node("ShaderNodeVectorMath", -2000, -1200, operation="SCALE")
+    L(wear.outputs["UV"], flake_uv.inputs[0])
+    flake_uv.inputs["Scale"].default_value = 1.0 / pn.FLAKE_SIZE
+    last, cracks = pn.lasting(g, lambda f: nm._image(f, True), wear.outputs["UV"], flake_uv.outputs["Vector"],
+                              mask.outputs["Color"], None, w_board=pn.W_BOARD_FENCE, x=-2000, y=-900)
+    attr = g.node("ShaderNodeVertexColor", -900, -450, layer_name=ATTR, label="Paint (RGB colour, A peeling)")
     peel = attr.outputs["Alpha"]
-    lo = math("SUBTRACT", -600, -350, peel, SOFT)
-    hi = math("ADD", -600, -500, peel, SOFT)
-    rng = node("ShaderNodeMapRange", -350, -250, interpolation_type="SMOOTHSTEP", label="Paint left")
-    L(mask.outputs["Color"], rng.inputs["Value"])
-    L(lo, rng.inputs["From Min"])
-    L(hi, rng.inputs["From Max"])
-    paint = rng.outputs["Result"]
+    paint = g.smooth(-350, -250, last, math("SUBTRACT", -600, -350, peel, SOFT),
+                     math("ADD", -600, -500, peel, SOFT), label="Paint left")
+    rim = g.smooth(-350, -600, math("ABSOLUTE", -500, -600, math("SUBTRACT", -650, -650, last, peel)),
+                   0.0, RIM, 1.0, 0.0, "Flake rim")
+    darken = math("MULTIPLY", 0, -600, math("MULTIPLY_ADD", -150, -600, rim, -0.18, 1.0),
+                  pn.crack(g, last, peel, cracks, x=-500, y=-850))
 
-    luma = node("ShaderNodeRGBToBW", -600, 100)
+    luma = g.node("ShaderNodeRGBToBW", -600, 100)
     L(wood.outputs["Color"], luma.inputs["Color"])
-    g = math("MULTIPLY", -400, 100, luma.outputs["Val"], 2.5)
-    g = math("MINIMUM", -250, 100, g, 1.0)
-    grain = math("MULTIPLY_ADD", -100, 100, g, 0.35, 0.65)      # mix(1, g, 0.35)
-
-    def mix_rgb(blend, x, y, fac, a, b):
-        m = node("ShaderNodeMix", x, y, data_type="RGBA", blend_type=blend)
-        sock = {s.identifier: s for s in m.inputs}
-        for key, v in (("Factor_Float", fac), ("A_Color", a), ("B_Color", b)):
-            if isinstance(v, (int, float)):
-                sock[key].default_value = v
-            else:
-                L(v, sock[key])
-        return next(s for s in m.outputs if s.identifier == "Result_Color")
-
-    coat = mix_rgb("MULTIPLY", 100, 0, 1.0, attr.outputs["Color"], grain)
-    albedo = mix_rgb("MIX", 350, 150, paint, wood.outputs["Color"], coat)
+    gr = math("MINIMUM", -250, 100, math("MULTIPLY", -400, 100, luma.outputs["Val"], 2.5), 1.0)
+    grain = math("MULTIPLY_ADD", -100, 100, gr, 0.35, 0.65)      # mix(1, g, 0.35)
+    coat = g.mix("RGBA", "MULTIPLY", 100, 0, 1.0, attr.outputs["Color"], math("MULTIPLY", 0, 100, grain, darken))
+    tinted = g.node("ShaderNodeVectorMath", 100, 350, operation="MULTIPLY", label="Old brown wood")
+    L(wood.outputs["Color"], tinted.inputs[0])
+    tinted.inputs[1].default_value = PEELED_TINT
+    albedo = g.mix("RGBA", "MIX", 450, 150, paint, tinted.outputs["Vector"], coat)
     L(albedo, bsdf.inputs["Base Color"])
-    rough = node("ShaderNodeMapRange", 350, -250)
-    L(paint, rough.inputs["Value"])
-    rough.inputs["To Min"].default_value = WOOD_ROUGH
-    rough.inputs["To Max"].default_value = PAINT_ROUGH
-    L(rough.outputs["Result"], bsdf.inputs["Roughness"])
-    bump = node("ShaderNodeBump", 350, -500)                   # cracks and grain (as the bare wood)
+    L(g.smooth(350, -250, paint, 0.0, 1.0, WOOD_ROUGH, PAINT_ROUGH), bsdf.inputs["Roughness"])
+    bump = g.node("ShaderNodeBump", 350, -500)                   # cracks and grain (as the bare wood)
     bump.inputs["Strength"].default_value = 0.25
     bump.inputs["Distance"].default_value = 0.003
     L(wood.outputs["Color"], bump.inputs["Height"])

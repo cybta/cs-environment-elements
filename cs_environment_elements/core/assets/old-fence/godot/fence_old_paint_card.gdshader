@@ -9,7 +9,7 @@ void fragment() {
 	vec3 albedo;
 	float rough;
 	float alpha;
-	fence_paint(UV, COLOR, albedo, rough, alpha);
+	fence_paint(UV, UV2, COLOR, albedo, rough, alpha);
 	ALBEDO = albedo;
 	ROUGHNESS = rough;
 	ALPHA = alpha;

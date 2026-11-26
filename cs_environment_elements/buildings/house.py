@@ -52,8 +52,14 @@ def _type_changed(self, context):
         return
     if abs(self.ceiling_height - 2.5) < 1e-4 and abs(self.ext_wall - 0.18) < 1e-4:    # back from a cottage
         self.ceiling_height, self.ext_wall = 2.7, 0.25
+    # The Mediterranean villa's rooms are 3 m high (room for the arches under the string course)
+    med = t == "VILLA_MEDITERRANEAN"
+    if med and abs(self.ceiling_height - 2.7) < 1e-4:
+        self.ceiling_height = 3.0
+    elif not med and abs(self.ceiling_height - 3.0) < 1e-4:
+        self.ceiling_height = 2.7
     if t.startswith("VILLA") and self.total_area < vl.MIN_AREA[t[6:]] + 20:
-        self.total_area = 240.0 if t == "VILLA_MODERN" else 200.0
+        self.total_area = {"VILLA_MODERN": 240.0, "VILLA_MEDITERRANEAN": 420.0}.get(t, 200.0)
 
 
 # Panel sections, in the order they are listed. Villa has sub-types (villa_style);
@@ -61,7 +67,7 @@ def _type_changed(self, context):
 # before sections existed (and the Surroundings generator, which sets building_type)
 # stay in step.
 SECTIONS = [
-    ("VILLA", "Villa", "Fancy new two-storey villas: modern or gable", "HOME", 0),
+    ("VILLA", "Villa", "Fancy new two-storey villas: modern, gable or Mediterranean", "HOME", 0),
     ("HOUSE", "House", "A plain house: one rectangular block, any roof", "HOME", 1),
     ("COTTAGE", "Cottage", "An old timber dacha on piles", "HOME", 2),
     ("SHOPS", "Shops", "A row of old high-street shops", "HOME", 3),
@@ -74,7 +80,10 @@ NOT_BUILDINGS = ("FENCE", "QUAY")      # sections that show their own tools inst
 COTTAGE_STYLES = [("TIMBER", "Old Timber", "Weathered bare timber siding under a gambrel roof, on steel piles"),
                   ("PAINTED", "Painted", "Weathered painted boards under an open gable roof, on a brick plinth")]
 VILLA_STYLES = [("MODERN", "Modern", "Flat-roofed box with a carport and a stone bay"),
-                ("GABLE", "Gable", "Steep street gable, timber bay, terrace and carport wing")]
+                ("GABLE", "Gable", "Steep street gable, timber bay, terrace and carport wing"),
+                ("MEDITERRANEAN", "Mediterranean", "A courtyard house of cream stucco: every room block under "
+                 "its own clay-tile roof at its own height (hips and open gables), an arcade round the courtyard, "
+                 "a two-storey entry with an arched door")]
 
 
 def _get_section(self):
@@ -94,7 +103,8 @@ def _set_section(self, value):
 
 def _get_villa_style(self):
     t = self.building_type
-    return 1 if (t if t.startswith("VILLA") else "VILLA_" + self.villa_last) == "VILLA_GABLE" else 0
+    style = t[6:] if t.startswith("VILLA") else self.villa_last
+    return next((i for i, (k, _, _) in enumerate(VILLA_STYLES) if k == style), 0)
 
 
 def _set_villa_style(self, value):
@@ -113,6 +123,10 @@ class HOUSEGEN_Settings(PropertyGroup):
              "recessed above it, and a stone-clad bay with tall glazing"),
             ("VILLA_GABLE", "Gable Villa", "A steep gable facing the street: the upper floor sits inside the roof, "
              "with a glazed gable and balcony, a timber-clad bay, a covered terrace and a carport wing"),
+            ("VILLA_MEDITERRANEAN", "Mediterranean Villa", "Spanish-style courtyard house: four wings round an "
+             "open courtyard with an arcade and fountain, each block under its own clay-tile roof at its own "
+             "height (hip roofs on the courtyard ring, open gables on the corner rooms and entry bay), a tall "
+             "great room with clerestory windows, a primary suite upstairs over the arched front door"),
             ("COTTAGE", "Old Cottage", "An old dacha (Old Timber or Painted style): weathered siding, a gambrel or open gable roof in "
              "corrugated sheet with bedrooms in the attic, and a covered veranda across the front"),
             ("SHOPS", "Shopping Row", "Old high-street shops side by side: glazed shopfronts with awnings and "
@@ -222,7 +236,9 @@ class HOUSEGEN_Settings(PropertyGroup):
         default="NEIGHBORHOOD",
     )
     facade: EnumProperty(name="Facade", items=nm.FACADE_ITEMS, default="RANDOM")
-    roof_color: EnumProperty(name="Roof Tiles", items=nm.ROOF_ITEMS, default="RANDOM")
+    roof_color: EnumProperty(name="Roof", items=nm.ROOF_ITEMS, default="RANDOM")
+    inner_walls: EnumProperty(name="Inner Walls", items=nm.INNER_ITEMS, default="FINISHED",
+                              description="What the walls inside a house or villa are left as")
     bath_tiles: BoolProperty(name="Tiled Bathrooms", description="Tile the floor and walls of bathrooms and WCs "
                              "(and the floor of a separate kitchen)", default=True)
     wall_material: EnumProperty(name="Walls", items=MATERIAL_ENUM_ITEMS, default=_default_set("walls"))
@@ -272,7 +288,27 @@ def _paint_walls(me, offset, plan, floor, mats):
             p.material_index = i_wet
         else:
             p.material_index = i_in
+    if "reveal" in mats:
+        _paint_reveals(me, offset, floor, _mat_index(me, mats["reveal"]))
     return me
+
+
+def _paint_reveals(me, offset, floor, i_rev):
+    """The faces inside each exterior window / door opening (jambs, head, sill: the wall's thickness) take
+    the trim, so the frame is white all the way in (user, 2026-11-24)."""
+    tol = 0.01
+    for o in floor.openings:
+        if not o.exterior or o.kind not in ("WINDOW", "ENTRANCE", "DOOR"):
+            continue
+        half = max(o.thickness, 0.05) / 2 + 0.05
+        for p in me.polygons:
+            c, n = p.center - offset, p.normal
+            s, across, ns = (c.x, c.y, abs(n.x)) if o.axis == "X" else (c.y, c.x, abs(n.y))
+            z = c.z                                  # offset already holds the storey height
+            if abs(across - o.coord) > half or not (o.s0 - tol <= s <= o.s1 + tol) or not (o.z0 - tol <= z <= o.z1 + tol):
+                continue
+            if ns > 0.9 or abs(n.z) > 0.9:          # a jamb faces along the wall, a head / sill up or down
+                p.material_index = i_rev
 
 
 def _pick_materials(s):
@@ -292,6 +328,10 @@ def _pick_materials(s):
             m = nm.house_palette(sm.facade_key(s.facade, s.seed), "RED", s.seed, s.bath_tiles)
         else:
             m = nm.house_palette(s.facade, s.roof_color, s.seed, s.bath_tiles)
+        if villa or s.building_type == "HOUSE":
+            m["wall_in"] = nm.inner_wall(s.inner_walls)
+            if not s.bath_tiles:
+                m["wall_wet"] = m["wall_in"]
     else:
         if s.material_style == "TEXTURE_SETS":
             k = s.tex_size
@@ -313,10 +353,12 @@ def _pick_materials(s):
             "rail": _material("RoomGen_Rail", (0.15, 0.15, 0.15)),
         }
         if villa:
-            stone = s.building_type == "VILLA_MODERN"
+            stone = s.building_type != "VILLA_GABLE"
             wood = _material("RoomGen_VillaTimber", (0.5, 0.33, 0.2))
             m.update({
                 "accent": _material("RoomGen_VillaStone", (0.6, 0.55, 0.48)) if stone else wood,
+                "limestone": _material("RoomGen_VillaLimestone", (0.8, 0.75, 0.66)),
+                "rafter": wood,
                 "recess": _material("RoomGen_VillaRecess", (0.6, 0.6, 0.62)),
                 "trim": _material("RoomGen_VillaTrim", (0.05, 0.05, 0.06)),
                 "soffit_wood": wood,
@@ -440,6 +482,8 @@ def _build(context, s, report, name=None, site=False):
         _obj(f"{p}_Walls", walls, fc, root, uv_z=f.base_z)     # wall tiles start at this storey's floor
 
         for r in f.rooms:
+            if r.kind == "void":                # open air with nothing in it (see house_walls)
+                continue
             label = f"{p}_{r.name.replace(' / ', '_').replace(' ', '_')}"
             outdoor = r.kind in hl.OUTDOOR
             top = 0.0
@@ -521,6 +565,8 @@ def _build(context, s, report, name=None, site=False):
     elif cottage:
         from . import cottage as cottage_exterior
         cottage_exterior.build_exterior(s, plan, mats, coll, root, name, center)
+        from . import grain
+        grain.align(root)                               # wood grain along each piece (trim, rails, beams)
         if s.material_style == "NEIGHBORHOOD":         # siding and roof paint (cottage_paint)
             cottage_paint.apply(root, s)
     elif shops:

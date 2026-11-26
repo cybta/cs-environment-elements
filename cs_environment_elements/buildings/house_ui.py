@@ -168,6 +168,8 @@ class HOUSEGEN_PT_panel(Panel):
                              ("320 m² · 5 bed", 320, 2, 5, 4)),
             "VILLA_GABLE": (("170 m² · 2 bed", 170, 2, 2, 2), ("200 m² · 3 bed", 200, 2, 3, 2),
                             ("260 m² · 4 bed", 260, 2, 4, 3)),
+            "VILLA_MEDITERRANEAN": (("380 m² · 3 bed", 380, 2, 3, 2), ("420 m² · 3 bed", 420, 2, 3, 2),
+                                    ("520 m² · 3 bed", 520, 2, 3, 2)),
             "COTTAGE": (("6x6 · 2 bed", 60, 2, 2, 0), ("6x8 · 3 bed", 80, 2, 3, 1),
                         ("7x8 · 3 bed", 95, 2, 3, 1)),
         }.get(s.building_type, ())
@@ -198,7 +200,10 @@ class HOUSEGEN_PT_panel(Panel):
             if s.total_area < low:
                 layout.label(text=f"Smallest this villa goes: {low:.0f} m²", icon="ERROR")
             else:
-                layout.label(text="Two floors; carport and balcony are extra", icon="INFO")
+                if s.building_type == "VILLA_MEDITERRANEAN":
+                    layout.label(text="Courtyard house: 3 bed, 2.5 bath; courtyard is extra", icon="INFO")
+                else:
+                    layout.label(text="Two floors; carport and balcony are extra", icon="INFO")
         else:
             layout.prop(s, "open_plan")
             per = s.total_area / max(1, s.floors)
@@ -265,8 +270,11 @@ class HOUSEGEN_PT_panel(Panel):
             mbox.prop(s, "bath_tiles")
         elif s.material_style == "NEIGHBORHOOD":
             mcol.prop(s, "facade")
-            if s.building_type == "VILLA_GABLE" or (not (villa or shops) and s.roof_type in ("GABLE", "HIP", "SHED")):
+            if s.building_type in ("VILLA_GABLE", "VILLA_MEDITERRANEAN") or (
+                    not (villa or shops) and s.roof_type in ("GABLE", "HIP", "SHED")):
                 mcol.prop(s, "roof_color")
+            if villa or s.building_type == "HOUSE":
+                mcol.prop(s, "inner_walls")
             mbox.prop(s, "bath_tiles")
         elif s.material_style == "TEXTURE_SETS":
             mcol.prop(s, "wall_material")

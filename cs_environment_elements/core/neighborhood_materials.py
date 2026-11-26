@@ -32,6 +32,8 @@ RECIPES = {
     "C_wall_peach": dict(tex=_PLASTER, scale=0.4, base=(0.92, 0.68, 0.55), rough=0.9, tint=(1.5, 1.077, 0.846)),
     "C_wall_sage": dict(tex=_PLASTER, scale=0.4, base=(0.66, 0.76, 0.62), rough=0.9, tint=(1.108, 1.292, 1.015)),
     "C_wall_blue": dict(tex=_PLASTER, scale=0.4, base=(0.6, 0.72, 0.84), rough=0.9, tint=(1.015, 1.231, 1.462)),
+    # rustic stone (user's maps, 2026-11-26): 2048 px for 2.4 m, about 10 courses of 15-25 cm stones
+    "C_wall_stone": dict(tex="stone_wall", scale=1 / 2.4, base=(0.66, 0.55, 0.4), rough=0.9),
     "C_house_brick": dict(tex="red_brick_03", scale=0.667, base=(0.45, 0.2, 0.13), rough=0.85),
     # Interior
     "C_interior_plaster": dict(tex=_PLASTER, scale=0.4, base=(0.88, 0.86, 0.82), rough=0.9, tint=(1.45, 1.4, 1.32)),
@@ -45,6 +47,18 @@ RECIPES = {
     "C_roof_red": dict(tex="clay_roof_tiles_02", scale=0.5, base=(0.6, 0.18, 0.12), rough=0.7),
     "C_roof_dark": dict(tex="grey_roof_tiles", scale=0.5, base=(0.18, 0.2, 0.23), rough=0.7, tint=(0.55, 0.58, 0.62)),
     "C_roof_teal": dict(tex="grey_roof_tiles", scale=0.5, base=(0.18, 0.38, 0.4), rough=0.7, tint=(0.45, 0.75, 0.75)),
+    # Asphalt shingles and the strips their roofs' edges are dressed in (user's maps, 2026-11-26). The
+    # sheets are 1600 px for 3 m (13 tabs a row); the edge strips have the same tabs across 1600 px, and their
+    # height is stretched over the edge (roof_edge.py lays the UVs: V = 0..1 from the edge's foot to its top).
+    "C_roof_shingle_brick": dict(tex="roof_shingle_brick", scale=1 / 3.0, base=(0.36, 0.14, 0.08), rough=0.85),
+    "C_roof_shingle_black": dict(tex="roof_shingle_black", scale=1 / 3.0, base=(0.07, 0.075, 0.09), rough=0.85),
+    "C_roof_edge_brick": dict(tex="roof_edge_brick", ext="png", scale=(1 / 3.0, 1.0), base=(0.36, 0.14, 0.08),
+                              rough=0.85),
+    "C_roof_edge_black": dict(tex="roof_edge_black", ext="png", scale=(1 / 3.0, 1.0), base=(0.05, 0.05, 0.06),
+                              rough=0.85),
+    # raw poured concrete for inner walls: the same concrete map as the plinths, lighter and rougher
+    "C_wall_concrete": dict(tex="concrete_wall_008", scale=0.5, base=(0.6, 0.6, 0.58), rough=0.92,
+                            tint=(1.5, 1.7, 2.4)),      # (the map is warm, 141 133 112: this turns it neutral grey)
     "C_roof_flat": dict(tex="concrete_wall_008", scale=0.5, base=(0.55, 0.55, 0.55), rough=0.85),
     "C_plinth": dict(tex="concrete_wall_008", scale=0.5, base=(0.45, 0.43, 0.4), rough=0.85),
     # Outdoors (roads, gardens, walls)
@@ -68,6 +82,15 @@ RECIPES = {
     "C_villa_tile_floor": dict(tex="villa_tile_floor", scale=1 / 2.4, base=(0.84, 0.81, 0.75), rough=0.15),
     "C_villa_stone": dict(tex="villa_tile_floor", scale=1 / 2.4, base=(0.6, 0.56, 0.5), rough=0.55, matt=True,
                           tint=(0.74, 0.69, 0.61)),
+    # Mediterranean villa: warm white hand-troweled stucco, and rustic limestone ashlar
+    # (2 m square, baked by tools/make_villa_textures.py) on the stone-clad walls
+    "C_villa_stucco": dict(tex="white_stucco", scale=0.333, base=(0.9, 0.87, 0.8), rough=0.9,
+                           tint=(1.2, 1.15, 1.04)),
+    "C_villa_ashlar": dict(tex="villa_ashlar", scale=0.5, base=(0.8, 0.75, 0.65), rough=0.8),
+    # new terracotta barrel tiles (from the user's photo, tools/make_villa_textures.py): the map is
+    # 2.53 x 2.28 m, 12 columns of about 21 cm across
+    "C_villa_roof_clay": dict(tex="villa_roof_tiles", scale=(1 / 2.526, 1 / 2.282), base=(0.566, 0.185, 0.081),
+                              rough=0.75),
     # Old cottage (maps baked by tools/make_cottage_textures.py). Boards lie along U, so
     # they run horizontally on walls; "rot" turns them to run along V (posts, deck, treads).
     "C_cottage_logs": dict(tex="cottage_logs", scale=1 / 1.44, base=(0.36, 0.32, 0.27), rough=0.85),
@@ -84,18 +107,31 @@ RECIPES = {
 # from the mesh's "Paint" colour attribute. Maps baked by tools/make_cottage_textures.py
 # (roof) and tools/make_cottage_paint_textures.py (siding: lap boards along U, so
 # horizontal on walls; T&G planks turned upright by the 90 degree rotation).
+# Where the paint has peeled, the siding shows the timber cottages' old brown wood (user, 2026-11-23): the
+# bare maps times these (linear) = cottage_wood_diff.jpg's mean colour
+UNDER_TINT_LAP = (1.69, 1.56, 1.43)
+UNDER_TINT_PLANKS = (1.03, 0.97, 0.92)
+UNDER_TINT_ROOF = (0.6, 0.56, 0.5)       # bare roof metal: dark, weathered galvanised, not near-white
 PAINT_SPECS = {
+    # the white trim (window frames and casings, corner boards, bargeboards, veranda posts, rails, balusters):
+    # old white paint over the timber cottages' old wood, peeling with the house (user, 2026-11-23);
+    # boards upright like the planks, so posts and casings run with the grain
+    "C_cottage_trim": dict(under="cottage_wood_diff.jpg", data="cottage_planks_paint.png", nor="cottage_wood_nor.jpg",
+                           rough="cottage_wood_rough.jpg", scale=1 / 1.44, rot=90.0, chalk_mul=0.55, chalk_add=0.4,
+                           paint_rough=0.62, zone=0.5, base=(0.78, 0.76, 0.7)),
     "C_cottage_roof_paint": dict(under="cottage_roof_diff.jpg", data="cottage_roof_paint.png",
                                  nor="cottage_roof_nor.jpg", rough="cottage_roof_rough.jpg", scale=0.5,
                                  chalk_mul=0.6, chalk_add=0.35, paint_rough=0.55, dirt_gain=1.15,
-                                 zone=0.7, rust=True, base=(0.4, 0.11, 0.09)),
+                                 zone=0.7, rust=True, metal=True, under_tint=UNDER_TINT_ROOF,
+                                 base=(0.4, 0.11, 0.09)),
     "C_cottage_lap_paint": dict(under="cottage_lap_diff.jpg", data="cottage_lap_paint.png",
                                 nor="cottage_lap_nor.jpg", rough="cottage_lap_rough.jpg", scale=1 / 1.44,
-                                chalk_mul=0.55, chalk_add=0.4, paint_rough=0.68, zone=0.5, base=(0.4, 0.5, 0.42)),
+                                chalk_mul=0.55, chalk_add=0.4, paint_rough=0.68, zone=0.5,
+                                under_tint=UNDER_TINT_LAP, base=(0.4, 0.5, 0.42)),
     "C_cottage_planks_paint_v": dict(under="cottage_planks_diff.jpg", data="cottage_planks_paint.png",
                                      nor="cottage_planks_nor.jpg", rough="cottage_planks_rough.jpg",
                                      scale=1 / 1.44, rot=90.0, chalk_mul=0.55, chalk_add=0.4, paint_rough=0.68,
-                                     zone=0.5, base=(0.4, 0.5, 0.42)),
+                                     zone=0.5, under_tint=UNDER_TINT_PLANKS, base=(0.4, 0.5, 0.42)),
 }
 
 # Paint colours (sRGB), picked from the reference photos. The painted cottage's siding:
@@ -122,16 +158,42 @@ FACADES = (
 COTTAGE_ROOFS = (               # corrugated sheet paint (sRGB)
     ("RED", "Red Corrugated", (0.34, 0.085, 0.075)),
     ("GREEN", "Green Corrugated", (0.13, 0.33, 0.2)),
-    ("GREY", "Grey Corrugated", (0.52, 0.54, 0.55)),
+    ("GREY", "Grey Corrugated", (0.34, 0.36, 0.37)),       # weathered galvanised grey (0.52 read near-white in sun)
 )
 ROOFS = (
     ("RED", "Red Clay Tiles", "C_roof_red"),
     ("DARK", "Dark Grey Tiles", "C_roof_dark"),
     ("TEAL", "Teal Tiles", "C_roof_teal"),
 )
+SHINGLES = (                    # a plain house's roof when the roof is left on Random
+    ("BRICK_SHINGLE", "Brick Shingles", "C_roof_shingle_brick"),
+    ("BLACK_SHINGLE", "Black Shingles", "C_roof_shingle_black"),
+)
+# The strip each roof's edges (eave fascias, gable verges) are dressed in; roofs not listed keep their
+# own material on the edges
+ROOF_EDGES = {"C_roof_shingle_brick": "C_roof_edge_brick", "C_roof_shingle_black": "C_roof_edge_black",
+              "C_villa_roof_clay": "C_roof_edge_brick"}
 _RANDOM = ("RANDOM", "Random", "Picked from the house seed")
-FACADE_ITEMS = [_RANDOM] + [(k, n, m) for k, n, m in FACADES]
-ROOF_ITEMS = [_RANDOM] + [(k, n, m) for k, n, m in ROOFS]
+# Chosen only, never by Random (so seeds keep their facades); listed after the others so saved files
+# keep their choice
+FACADES_EXTRA = (
+    ("STONE", "Stone", "C_wall_stone"),
+)
+# Inner walls of houses and villas (not cottages or shops): the finished plaster the Mediterranean villa
+# was built with is the default
+INNER_WALLS = (
+    ("FINISHED", "Finished", "Smooth finished plaster", "C_villa_plaster"),
+    ("CONCRETE", "Unfinished Concrete", "Raw poured concrete, left bare", "C_wall_concrete"),
+)
+INNER_ITEMS = [(k, n, d) for k, n, d, _ in INNER_WALLS]
+
+
+def inner_wall(key):
+    return ensure(next((m for k, _, _, m in INNER_WALLS if k == key), INNER_WALLS[0][3]))
+
+
+FACADE_ITEMS = [_RANDOM] + [(k, n, m) for k, n, m in FACADES + FACADES_EXTRA]
+ROOF_ITEMS = [_RANDOM] + [(k, n, m) for k, n, m in ROOFS + SHINGLES]      # appended: saved files keep their choice
 _CUSTOM = ("CUSTOM", "Custom", "Any colour from the colour picker")
 COTTAGE_ROOF_ITEMS = [_RANDOM] + [(k, n, f"{n} sheet") for k, n, _ in COTTAGE_ROOFS] + [_CUSTOM]
 COTTAGE_PAINT_ITEMS = [_RANDOM] + [(k, n, f"Weathered {n.lower()} paint") for k, n, _, _ in COTTAGE_PAINTS] \
@@ -352,7 +414,7 @@ _SPECIAL = {
     "C_villa_render_grey": lambda n: _build_smooth(n, (0.36, 0.37, 0.39), 0.92, 0.08),
     "C_villa_stair_glass": _build_smoked_glass,
     "C_villa_stair_post": lambda n: _new(n, (0.017, 0.017, 0.017), 0.5)[0],
-    "C_cottage_trim": lambda n: _build_smooth(n, (0.78, 0.76, 0.7), 0.7, 0.06),     # old white paint
+    "C_villa_limestone": lambda n: _build_smooth(n, (0.68, 0.6, 0.47), 0.75, 0.2),    # sills, bands, arch surrounds
     "C_cottage_pile": lambda n: _build_metal(n, (0.09, 0.07, 0.06), 0.75, 0.5),      # rusty steel piles
 }
 
@@ -393,13 +455,13 @@ def house_palette(facade="RANDOM", roof="RANDOM", seed=0, bath_tiles=True):
     """{role: material} for one house. 'RANDOM' choices follow the seed."""
     rng = random.Random(seed * 7919 + 101)
     rand_facade = rng.choice(FACADES)[2]   # always draw both, so fixing one
-    rand_roof = rng.choice(ROOFS)[2]       # choice doesn't reshuffle the other
-    facade_mat = rand_facade if facade == "RANDOM" else dict((k, m) for k, _, m in FACADES)[facade]
-    roof_mat = rand_roof if roof == "RANDOM" else dict((k, m) for k, _, m in ROOFS)[roof]
+    rand_roof = rng.choice(SHINGLES)[2]    # choice doesn't reshuffle the other
+    facade_mat = rand_facade if facade == "RANDOM" else dict((k, m) for k, _, m in FACADES + FACADES_EXTRA)[facade]
+    roof_mat = rand_roof if roof == "RANDOM" else dict((k, m) for k, _, m in SHINGLES + ROOFS)[roof]
 
     plaster = ensure("C_interior_plaster")
     floor = ensure("C_floor_wood")
-    return {
+    return _add_roof_edge({
         "wall_in": plaster,
         "wall_out": ensure(facade_mat),
         "wall_wet": ensure("C_bath_tile_wall") if bath_tiles else plaster,
@@ -413,22 +475,29 @@ def house_palette(facade="RANDOM", roof="RANDOM", seed=0, bath_tiles=True):
         "glass": ensure("C_window_glass"),
         "stair": ensure("C_stair_wood"),
         "rail": ensure("C_gutter"),
-    }
+    })
+
+
+VILLA_ACCENTS = {"MODERN": "C_villa_stone", "GABLE": "C_villa_timber", "MEDITERRANEAN": "C_villa_ashlar"}
 
 
 def villa_palette(style, facade="RANDOM", roof="RANDOM", seed=0, bath_tiles=True):
     """A villa in new condition: clean white plaster inside, marble-tiled bathrooms
     (60 x 120 slabs on the walls, 60 x 60 on the floor), fresh render outside.
     'RANDOM' means the style's own look: white render with dark roof tiles, stone
-    tiles (modern) or timber (gable) on the front bay."""
-    m = house_palette("WHITE" if facade == "RANDOM" else facade, "DARK" if roof == "RANDOM" else roof, seed, bath_tiles)
+    tiles (modern) or timber (gable) on the front bay; the Mediterranean villa has
+    cream stucco, red clay tiles and limestone ashlar on its stone-clad walls."""
+    med = style == "MEDITERRANEAN"
+    default_roof = "RED" if med else "DARK"
+    m = house_palette(("CREAM" if med else "WHITE") if facade == "RANDOM" else facade, default_roof if roof == "RANDOM" else roof, seed,
+                      bath_tiles)
     plaster = ensure("C_villa_plaster")
     m.update({
         "wall_in": plaster,
         "ceiling": plaster,
         "wall_wet": ensure("C_villa_tile_wall") if bath_tiles else plaster,
         "floor_wet": ensure("C_villa_tile_floor") if bath_tiles else m["floor"],
-        "accent": ensure("C_villa_stone" if style == "MODERN" else "C_villa_timber"),
+        "accent": ensure(VILLA_ACCENTS[style]),
         "recess": ensure("C_villa_render_grey"),
         "deck": ensure("C_villa_stone"),
         "trim": ensure("C_villa_trim"),
@@ -439,8 +508,29 @@ def villa_palette(style, facade="RANDOM", roof="RANDOM", seed=0, bath_tiles=True
         "stair_glass": ensure("C_villa_stair_glass"),
         "stair_post": ensure("C_villa_stair_post"),
     })
+    if med:
+        m.update({
+            "limestone": ensure("C_villa_limestone"),
+            "rafter": ensure("C_villa_timber"),
+            "paving": ensure("C_path"),
+            "planter_top": ensure("C_hedge_leaves"),
+        })
     if facade == "RANDOM":
-        m["wall_out"] = ensure("C_villa_render")
+        m["wall_out"] = ensure("C_villa_stucco" if med else "C_villa_render")
+    if med:
+        # eaves between the timber rafter tails in the facade's render (stucco under a stone house)
+        m["soffit"] = ensure("C_villa_stucco") if facade == "STONE" else m["wall_out"]
+        if roof in ("RANDOM", "RED"):
+            m["roof"] = ensure("C_villa_roof_clay")
+    m.pop("roof_edge", None)
+    _add_roof_edge(m)
+    return m
+
+
+def _add_roof_edge(m):
+    edge = ROOF_EDGES.get(m["roof"].name)
+    if edge:
+        m["roof_edge"] = ensure(edge)
     return m
 
 
@@ -487,6 +577,7 @@ def cottage_palette(roof="RANDOM", seed=0, bath_tiles=True):
         "stair_v": ensure("C_cottage_lining_v"),
         "rail": ensure("C_cottage_wood"),
         "trim": ensure("C_cottage_trim"),
+        "reveal": ensure("C_cottage_trim"),            # inside the window / door openings: white like the frame
         "timber": ensure("C_cottage_wood"),
         "post": ensure("C_cottage_wood_v"),
         "pile": ensure("C_cottage_pile"),

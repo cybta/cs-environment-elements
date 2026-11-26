@@ -30,6 +30,7 @@ EAVE = 0.3              # eave overhang past the side walls (horizontal)
 VERGE = 0.3             # verge overhang past the gable walls
 DECK_TOP = -0.04        # the veranda one step-lip below the floor inside
 VERANDA_PITCH = 14.0
+JOIST_SET_BACK = 0.01   # the veranda's deck and rim joists sit this far behind the posts' faces (no shared plane)
 EPS = 1e-4
 
 
@@ -317,10 +318,14 @@ def _veranda(c):
     y_out = y_in - vd
     x0, x1 = -te / 2, W + te / 2
 
-    c.add("VerandaDeck", [(x0, y_out, DECK_TOP - 0.045, x1, y_in, DECK_TOP)], "post")
+    # the deck and the rim stand JOIST_SET_BACK behind the posts' outer faces: flush, the faces share a plane and
+    # flicker (z-fighting) in the game wherever a post passes the deck edge or the rim
+    sb = JOIST_SET_BACK
+    c.add("VerandaDeck", [(x0 + sb, y_out + sb, DECK_TOP - 0.045, x1 - sb, y_in, DECK_TOP)], "post")
     jz0, jz1 = DECK_TOP - 0.22, DECK_TOP - 0.045
-    c.add("VerandaJoists", [(x0, y_out, jz0, x1, y_out + 0.05, jz1), (x0, y_out + 0.05, jz0, x0 + 0.05, y_in, jz1),
-                            (x1 - 0.05, y_out + 0.05, jz0, x1, y_in, jz1)], "timber")
+    c.add("VerandaJoists", [(x0 + sb, y_out + sb, jz0, x1 - sb, y_out + 0.05, jz1),
+                            (x0 + sb, y_out + 0.05, jz0, x0 + 0.05, y_in, jz1),
+                            (x1 - 0.05, y_out + 0.05, jz0, x1 - sb, y_in, jz1)], "timber")
 
     # Lean-to roof from the front wall, just above the attic floor, down over the posts
     tn = math.tan(math.radians(VERANDA_PITCH))

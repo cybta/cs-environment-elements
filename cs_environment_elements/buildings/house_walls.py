@@ -4,6 +4,8 @@ Rooms tile the footprint rectangle. A room whose kind is in OUTDOOR (carport,
 terrace, balcony) is open air: it gets no walls of its own, and the edge it
 shares with an indoor room is an outside wall. That is how villas get a
 carport cut out of the ground floor or a balcony recessed into the upper one.
+A "void" is open air with nothing at all in it (no slab): the sky round an upper floor
+that covers only part of the footprint, or a recess in a facade.
 """
 
 import math
@@ -13,7 +15,7 @@ try:
 except ImportError:  # run as a plain script, outside the addon package
     from villa_stair import GAP, stair_fence
 
-OUTDOOR = ("carport", "terrace", "balcony")
+OUTDOOR = ("carport", "terrace", "balcony", "void")
 
 
 def shared_edge(a, b):
@@ -150,7 +152,32 @@ def _build_walls(plan, f):
             cur = max(cur, o.s1)
         if b > cur + 1e-4:
             boxes.append(_wall_box(axis, c, t, cur, b, z0, top))
-    f.walls = boxes
+    f.walls = _split_at_wet_rooms(f, boxes)
+
+
+WET = ("bathroom", "wc")
+
+
+def _split_at_wet_rooms(f, boxes):
+    """Cut wall boxes where a bathroom / WC begins and ends along them. A face is painted by
+    the room its centre looks into (house._paint_walls), so a long wall shared by a bathroom
+    and its neighbours would otherwise be tiled all the way along, or not at all."""
+    wet = [r for r in f.rooms if r.kind in WET]
+    if not wet:
+        return boxes
+    xs = sorted({v for r in wet for v in (r.x0, r.x1)})
+    ys = sorted({v for r in wet for v in (r.y0, r.y1)})
+    out = []
+    for x0, y0, z0, x1, y1, z1 in boxes:
+        if x1 - x0 >= y1 - y0:                              # runs along x
+            cuts = [v for v in xs if x0 + 1e-3 < v < x1 - 1e-3]
+            edges = [x0] + cuts + [x1]
+            out += [(a, y0, z0, b, y1, z1) for a, b in zip(edges[:-1], edges[1:])]
+        else:
+            cuts = [v for v in ys if y0 + 1e-3 < v < y1 - 1e-3]
+            edges = [y0] + cuts + [y1]
+            out += [(x0, a, z0, x1, b, z1) for a, b in zip(edges[:-1], edges[1:])]
+    return out
 
 
 def _cut(a, b, c0, c1):
